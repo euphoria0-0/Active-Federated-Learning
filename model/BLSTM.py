@@ -4,6 +4,7 @@ import torch
 
 class BLSTM(nn.Module):
     def __init__(self, embedding_dim=64, vocab_size=2, blstm_hidden_size=32, mlp_hidden_size=64, blstm_num_layers=2):
+        super(BLSTM, self).__init__()
         # AFL: 64-dim embedding, 32-dim BLSTM, MLP with one layer(64-dim)
         self.embeddings = nn.Embedding(num_embeddings=vocab_size, embedding_dim=embedding_dim, padding_idx=0)
         self.blstm = nn.LSTM(input_size=embedding_dim, hidden_size=blstm_hidden_size, num_layers=blstm_num_layers,

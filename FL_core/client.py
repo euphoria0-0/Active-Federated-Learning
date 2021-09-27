@@ -1,5 +1,5 @@
 
-from trainer import Trainer
+from FL_core.trainer import Trainer
 
 
 class Client(object):

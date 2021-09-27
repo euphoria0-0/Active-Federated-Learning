@@ -1,13 +1,14 @@
 import torch
 import wandb
 
-from client import Client
-from trainer import Trainer
-from client_selection import ClientSelection, ActiveFederatedLearning
+from FL_core.client import Client
+from FL_core.trainer import Trainer
+from FL_core.client_selection import ClientSelection, ActiveFederatedLearning
 
 
 class Server(object):
-    def __init__(self, train_data, test_data, train_sizes, test_sizes, device, method='random'):
+    def __init__(self, data, device, method='random'):
+        train_data, test_data, train_sizes, test_sizes = data
         self.train_data = train_data
         self.train_sizes = train_sizes
         self.test_data = test_data
@@ -91,7 +92,7 @@ class Server(object):
                 metrics['loss'].append(result['loss'].item())
                 metrics['acc'].append(result['acc'].item())
 
-            wandb.log({
+            '''wandb.log({
                 mode+'/Loss': sum(metrics['loss']) / datasize,
                 mode+'/Acc': sum(metrics['acc']) / datasize
-            })
+            })'''

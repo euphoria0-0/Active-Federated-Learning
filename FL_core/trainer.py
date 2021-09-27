@@ -4,9 +4,9 @@ import torch
 
 
 class Trainer:
-    def __init__(self, model, args, device):
+    def __init__(self, model, args):
         self.model = model
-        self.device = device
+        self.device = args.device
         self.client_optimizer = args.client_optimizer
         self.lr = args.lr
         self.wdecay = args.wdecay
