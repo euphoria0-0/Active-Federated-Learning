@@ -44,6 +44,25 @@ class Trainer:
                 loss.backward()
                 optimizer.step()
 
-            return correct / total, train_loss / total
+        return correct / total, train_loss / total
 
     def test(self, data):
+        model = self.model.to(self.device)
+        model.eval()
+
+        criterion = nn.CrossEntropyLoss().to(self.device)
+
+        with torch.no_grad():
+            for epoch in range(self.num_epoch):
+                test_loss, correct, total = 0, 0, 0
+                for input, labels in data:
+                    input, labels = input.to(self.device), labels.to(self.device)
+                    output = model(input)
+                    loss = criterion(output, labels.long())
+                    _, preds = torch.max(output.data, 1)
+
+                    test_loss += torch.sum(loss)
+                    correct += preds.eq(labels).sum()
+                    total += input.size(0)
+
+        return correct / total, test_loss / total
