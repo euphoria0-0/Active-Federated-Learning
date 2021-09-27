@@ -35,32 +35,9 @@ class RedditDataset(Dataset):
             print('>> get preprocessed Reddit dataset ...')
 
         else:
-            torch.random.seed(0)
-            selected_users_idx = torch.randint(84965681, (8000,)).tolist() # preprocessing1
+            text, labels = self._preprocess(data_dir)
 
-            users, text, labels = [], [], []
-            with bz2.BZ2File(os.path.join(data_dir,'RC_2017-11.bz2'), 'r') as f:
-                for i, line in enumerate(f):
-                    #if i > 10000: break  ##### just for test!
-                    if i in selected_users_idx:
-                        line = json.loads(line.rstrip())
-                        if line['body'] != '': # preprocessing4
-                            users.append(line['author'])
-                            text.append(line['body'])
-                            labels.append(int(line['controversiality']))
-                    else:
-                        continue
-
-            # preprocessing3
-            drop_users = []
-            for user, count in Counter(users):
-                if count > 100:
-                    drop_users.append(user)
-            selected_users_idx = [i for i,x in enumerate(users) if x not in drop_users]
-            self.num_users = len(selected_users_idx)
-            print(f'Total number of users: {self.num_users}')
-            text = np.array(text)[selected_users_idx].tolist()
-            labels = np.array(labels)[selected_users_idx].tolist()
+        print(f'Total number of users: {self.num_users}')
 
         self.train_data = {
             'text': text,
@@ -80,3 +57,43 @@ class RedditDataset(Dataset):
         for client_idx in range(self.train_num_clients):
             local_data[client_idx] = self.data[client_idx]
         self.local_data = local_data
+
+
+    def _preprocess(self, data_dir):
+        users, subusers, text, labels = [], [], [], []
+        with bz2.BZ2File(os.path.join(data_dir, 'RC_2017-11.bz2'), 'r') as f:
+            for i, line in enumerate(f):
+                # if i > 10000: break  ##### just for test!
+                #if i in selected_users_idx:
+                line = json.loads(line.rstrip())
+                #    if line['body'] != '':  # preprocessing4
+                users.append(line['author'])
+                subusers.append(line['subreddit'])
+                text.append(line['body'])
+                labels.append(int(line['controversiality']))
+
+        # preprocessing 2
+        drop_users = []
+        for user, count in Counter(users).items():
+            if count > 100:
+                drop_users.append(user)
+        selected_users_idx2 = [i for i, x in enumerate(users) if x not in drop_users]
+        print(len(selected_users_idx2))
+
+        # preprocessing 1
+        torch.random.seed(0)
+        selected_users_idx1 = torch.randint(84965681, (8000,)).tolist()
+        selected_users_idx = list(set(selected_users_idx1 + selected_users_idx2))
+
+        # preprocessing 3-4
+        drop_users = []
+        for i in selected_users_idx:
+            if users[i] == subusers[i] or text[i] == '':
+                drop_users.append(i)
+        selected_users_idx = [x for x in selected_users_idx if x not in drop_users]
+
+        text = np.array(text)[selected_users_idx].tolist()
+        labels = np.array(labels)[selected_users_idx].tolist()
+        self.num_users = len(selected_users_idx)
+
+        return text, labels
