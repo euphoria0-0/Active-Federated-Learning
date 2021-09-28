@@ -1,9 +1,10 @@
 import torch
 import wandb
+from copy import deepcopy
 
 from FL_core.client import Client
 from FL_core.trainer import Trainer
-from FL_core.client_selection import ClientSelection, ActiveFederatedLearning
+from FL_core.client_selection import ActiveFederatedLearning
 
 
 class Server(object):
@@ -18,7 +19,7 @@ class Server(object):
         self.args = args
 
         self.client_list = []
-        self.total_num_clients = 7527
+        self.total_num_clients = 7656
         self.num_clients_per_round = 200
         self.total_round = 20
 
@@ -38,20 +39,26 @@ class Server(object):
 
     def _aggregate_local_models(self, local_models, client_indices, method='FedAvg'):
         if method == 'FedAvg':
-            global_model = local_models[0].keys()
-            for k in local_models[0].keys():
-                for idx in range(1,len(local_models)):
-                    local_model = local_models[idx]
-                    num_local_data = self.train_sizes[client_indices]
+            global_model = deepcopy(local_models[0].cpu().state_dict())
+            for k in global_model.keys():
+                for idx in range(len(local_models)):
+                    local_model = deepcopy(local_models[idx])
+                    num_local_data = self.train_sizes[client_indices[idx]]
                     weight = num_local_data / sum(self.train_sizes)
-                    global_model[k] += weight * local_model[k]
+                    if idx == 0:
+                        global_model[k] = weight * local_model.cpu().state_dict()[k]
+                    else:
+                        global_model[k] += weight * local_model.cpu().state_dict()[k]
+        elif method == 'FedAdam':
+            pass
 
         return global_model
 
     def train(self):
         # get global model
-        global_model = self.trainer.get_model()
+        global_model = self.trainer.get_model_params()
         for round_idx in range(self.total_round):
+            print(f'>> round {round_idx}')
             # set clients
             if self.method == 'random':
                 client_indices = torch.randint(self.total_num_clients, (self.num_clients_per_round,)).tolist()
@@ -62,8 +69,8 @@ class Server(object):
             local_models, local_losses = [], []
             for client_idx in client_indices:
                 client = self.client_list[client_idx]
-                local_model, local_loss = client.train(global_model)
-                local_models.append(local_model)
+                local_model, local_loss = client.train(deepcopy(global_model))
+                local_models.append(deepcopy(local_model))
                 local_losses.append(local_loss)
 
             # client selection
@@ -77,23 +84,23 @@ class Server(object):
 
             # update global model
             global_model = self._aggregate_local_models(local_models, client_indices)
-            self.trainer.set_model(global_model)
+            self.trainer.set_model_params(global_model)
 
             # test
-            self._test(round_idx)
+            #self._test(round_idx)
 
 
     def _test(self, round_idx):
-        for mode in ['Train', 'Test']:
-            datasize = sum(self.train_sizes) if mode == 'Train' else sum(self.test_sizes)
-            metrics = {'loss': [], 'acc': []}
-            for client_idx in range(self.total_num_clients):
-                client = self.client_list[client_idx]
-                result = client.test(mode.lower())
-                metrics['loss'].append(result['loss'].item())
-                metrics['acc'].append(result['acc'].item())
+        #for mode in ['Train', 'Test']:
+        #datasize = sum(self.train_sizes) if mode == 'Train' else sum(self.test_sizes)
+        metrics = {'loss': [], 'acc': []}
+        for client_idx in range(100):#self.total_num_clients
+            client = self.client_list[client_idx]
+            result = client.test('test')
+            metrics['loss'].append(result['loss'].item())
+            metrics['acc'].append(result['acc'].item())
 
-            '''wandb.log({
-                mode+'/Loss': sum(metrics['loss']) / datasize,
-                mode+'/Acc': sum(metrics['acc']) / datasize
-            })'''
+        '''wandb.log({
+            'Test/Loss': sum(metrics['loss']) / datasize,
+            'Test/Acc': sum(metrics['acc']) / datasize
+        })'''

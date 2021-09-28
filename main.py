@@ -25,12 +25,13 @@ def get_args():
     parser.add_argument('--dataset', type=str, default='Reddit', help='dataset')
     parser.add_argument('--data_dir', type=str, default='D:/data/Reddit/', help='dataset directory')
     parser.add_argument('--model', type=str, default='BLSTM', help='model')
+    parser.add_argument('--method', type=str, default='Random', help='Random or AFL')
 
     parser.add_argument('--client_optimizer', type=str, default='sgd', help='optimizer for client')
     parser.add_argument('--lr', type=float, default=0.01, help='learning rate')
     parser.add_argument('--wdecay', type=float, default=5e-4, help='learning rate')
 
-    parser.add_argument('--num_epoch', type=int, default=100, help='learning rate')
+    parser.add_argument('--num_epoch', type=int, default=50, help='learning rate')
     args = parser.parse_args()
     return args
 
@@ -50,15 +51,12 @@ if __name__ == '__main__':
     args = get_args()
     '''wandb.init(
         project=f'AFL-{args.data}',
-        name=f"AFL-lr{args.lr}-{args.comment}",
+        name=f"{args.method}-lr{args.lr}-{args.comment}",
         config=args
     )'''
     args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(args.device)  # change allocation of current GPU
     print('Current cuda device: {}'.format(torch.cuda.current_device()))
-
-    #torch.backends.cudnn.enabled = False
-    #os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
     # set data
     dataset = load_data(args)
@@ -69,7 +67,7 @@ if __name__ == '__main__':
     trainer = Trainer(model, args)
 
     # set federated optim algorithm
-    FedAPI = Server(dataset, model, args, method='random')
+    FedAPI = Server(dataset, model, args, method=args.method.lower())
 
     # train
     FedAPI.train()

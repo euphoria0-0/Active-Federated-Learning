@@ -1,4 +1,3 @@
-
 from FL_core.trainer import Trainer
 
 
@@ -11,9 +10,8 @@ class Client(object):
         self.trainer = Trainer(model, args)
 
     def train(self, global_model):
-        self.trainer.set_model(global_model)
-        model, loss = self.trainer.train(self.local_train_data)
-        self.model, self.loss = model, loss
+        self.trainer.set_model_params(global_model)
+        model, _, loss = self.trainer.train(self.local_train_data)
         return model, loss
 
     def test(self, mode='test'):

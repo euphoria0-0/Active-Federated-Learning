@@ -16,7 +16,7 @@ class RedditDataset:
         self.test_size = 15568 # messages
         self.train_num_clients = 7656 # 7527 # users
         self.test_num_clients = 3440 # users
-        self.batch_size = 64
+        self.batch_size = 128
         self.maxlen = 500
         self.device = device
 
@@ -40,20 +40,19 @@ class RedditDataset:
             train_data_global, test_data_global = list(), list()
             for client_idx in tqdm(range(self.train_num_clients), desc='>> Split data to clients'):
                 user_train_data_num = dataset[str(client_idx)]['num_data']
-                #user_test_data_num = dataset[client_idx]['num_data']
+
+                # split train, test
+                train_idx = 0
+
                 train_data_num += user_train_data_num
-                #test_data_num += user_test_data_num
                 train_data_local_num_dict[client_idx] = user_train_data_num
 
                 # transform to batches
                 train_batch = self._batch_data(dataset[str(client_idx)])
-                #test_batch = self._batch_data()
 
                 # index using client index
                 train_data_local_dict[client_idx] = train_batch
-                #test_data_local_dict[client_idx] = test_batch
                 train_data_global += train_batch
-                #test_data_global += test_batch
 
             dataset = {}
             dataset['train'] = {
@@ -67,7 +66,7 @@ class RedditDataset:
 
             self.dataset = dataset
         else:
-            self.dataset = self._preprocess(data_dir)
+            self.dataset = preprocess(data_dir)
 
     def _batch_data(self, data):
         '''
@@ -115,55 +114,58 @@ class RedditDataset:
             x_batch2 = torch.cat((x_batch2, x), dim=0)
         return x_batch2
 
-    def _preprocess(self, data_dir):
-        print('>> load and preprocess data ... WARNING ... it will take about 16 hours ...')
-        users, dataset = {}, {}
-        num_user = 0
-        with bz2.BZ2File(os.path.join(data_dir, 'RC_2017-11.bz2'), 'r') as f:
-            for i, line in tqdm(enumerate(f)):
-                if i > 100000: break
-                line = json.loads(line.rstrip())
-                user = line['author']
-                if user not in users.keys():
-                    users[user] = num_user
-                    user_idx = num_user
-                    dataset[user_idx] = {
-                        'num_data': 1,
-                        'subreddit': [line['subreddit']],
-                        'text': [line['body']],
-                        'label': [int(line['controversiality'])]
-                    }
-                    num_user += 1
-                else:
-                    user_idx = users[user]
-                    dataset[user_idx]['num_data'] += 1
-                    dataset[user_idx]['subreddit'].append(line['subreddit'])
-                    dataset[user_idx]['text'].append(line['body'])
-                    dataset[user_idx]['label'].append(line['controversiality'])
 
-        print(len(users.keys()), len(dataset.keys()))
 
-        torch.manual_seed(0)
-        select_users_indices = torch.randint(len(users.keys()), (8000,)).tolist()
 
-        final_dataset = {}
-        for user_id, user_idx in tqdm(users.items()):
-            # preprocess 1
-            if user_idx in select_users_indices:
-                _data = dataset[user_idx]
-                # preprocess 2
-                if _data['num_data'] <= 100:
-                    select_idx = []
-                    for idx in range(_data['num_data']):
-                        # preprocess 3-4
-                        if user_id != _data['subreddit'][idx] or _data['text'] != '':
-                            select_idx.append(idx)
-                    final_dataset[user_idx] = {
-                        'user_id': user_id,
-                        'num_data': len(select_idx),
-                        'text': np.array(_data['text'])[select_idx].tolist(),
-                        'label': np.array(_data['label'])[select_idx].tolist()
-                    }
-        print(len(final_dataset.keys()))
+def preprocess(data_dir):
+    print('>> load and preprocess data ... WARNING ... it will take about 16 hours ...')
+    users, dataset = {}, {}
+    num_user = 0
+    with bz2.BZ2File(os.path.join(data_dir, 'RC_2017-11.bz2'), 'r') as f:
+        for i, line in tqdm(enumerate(f)):
+            #if i > 100000: break
+            line = json.loads(line.rstrip())
+            user = line['author']
+            if user not in users.keys():
+                users[user] = num_user
+                user_idx = num_user
+                dataset[user_idx] = {
+                    'num_data': 1,
+                    'subreddit': [line['subreddit']],
+                    'text': [line['body']],
+                    'label': [int(line['controversiality'])]
+                }
+                num_user += 1
+            else:
+                user_idx = users[user]
+                dataset[user_idx]['num_data'] += 1
+                dataset[user_idx]['subreddit'].append(line['subreddit'])
+                dataset[user_idx]['text'].append(line['body'])
+                dataset[user_idx]['label'].append(line['controversiality'])
 
-        return final_dataset
+    print(len(users.keys()), len(dataset.keys()))
+
+    torch.manual_seed(0)
+    select_users_indices = torch.randint(len(users.keys()), (8000,)).tolist()
+
+    final_dataset = {}
+    for user_id, user_idx in tqdm(users.items()):
+        # preprocess 1
+        if user_idx in select_users_indices:
+            _data = dataset[user_idx]
+            # preprocess 2
+            if _data['num_data'] <= 100:
+                select_idx = []
+                for idx in range(_data['num_data']):
+                    # preprocess 3-4
+                    if user_id != _data['subreddit'][idx] or _data['text'] != '':
+                        select_idx.append(idx)
+                final_dataset[user_idx] = {
+                    'user_id': user_id,
+                    'num_data': len(select_idx),
+                    'text': np.array(_data['text'])[select_idx].tolist(),
+                    'label': np.array(_data['label'])[select_idx].tolist()
+                }
+    print(len(final_dataset.keys()))
+
+    return final_dataset
