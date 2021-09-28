@@ -13,7 +13,7 @@ class Trainer:
         self.num_epoch = args.num_epoch
 
     def get_model(self):
-        return self.model.cpu().state_dict()
+        return self.model
 
     def set_model(self, model):
         self.model = model
@@ -22,7 +22,8 @@ class Trainer:
         model = self.model.to(self.device)
         model.train()
 
-        criterion = nn.CrossEntropyLoss().to(self.device)
+        #criterion = nn.CrossEntropyLoss().to(self.device)
+        criterion = nn.BCEWithLogitsLoss().to(self.device)
         if self.client_optimizer == 'sgd':
             optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
         else:
@@ -34,7 +35,7 @@ class Trainer:
                 input, labels = input.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
                 output = model(input)
-                loss = criterion(output, labels.long())
+                loss = criterion(output, labels.unsqueeze(1).type_as(output))
                 _, preds = torch.max(output.data, 1)
 
                 train_loss += torch.sum(loss)
@@ -50,7 +51,8 @@ class Trainer:
         model = self.model.to(self.device)
         model.eval()
 
-        criterion = nn.CrossEntropyLoss().to(self.device)
+        #criterion = nn.CrossEntropyLoss().to(self.device)
+        criterion = nn.BCEWithLogitsLoss().to(self.device)
 
         with torch.no_grad():
             for epoch in range(self.num_epoch):

@@ -3,16 +3,16 @@ from FL_core.trainer import Trainer
 
 
 class Client(object):
-    def __init__(self, client_idx, local_train_data, local_test_data, device):
+    def __init__(self, client_idx, local_train_data, local_test_data, model, args):
         self.client_idx = client_idx
         self.local_train_data = local_train_data
         self.local_test_data = local_test_data
-        self.device = device
-        self.trainer = Trainer(self.device)
+        self.device = args.device
+        self.trainer = Trainer(model, args)
 
     def train(self, global_model):
         self.trainer.set_model(global_model)
-        model, loss = self.trainer.train()
+        model, loss = self.trainer.train(self.local_train_data)
         self.model, self.loss = model, loss
         return model, loss
 

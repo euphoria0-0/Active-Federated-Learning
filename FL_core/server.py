@@ -7,26 +7,28 @@ from FL_core.client_selection import ClientSelection, ActiveFederatedLearning
 
 
 class Server(object):
-    def __init__(self, data, device, method='random'):
+    def __init__(self, data, model, args, method='random'):
         self.train_data = data['train']['data']
         self.train_sizes = data['train']['data_sizes']
         self.test_data = data['test']['data']
         self.test_sizes = data['test']['data_sizes']
         self.method = method
-        self.device = device
+        self.model = model
+        self.device = args.device
+        self.args = args
 
         self.client_list = []
         self.total_num_clients = 7527
         self.num_clients_per_round = 200
         self.total_round = 20
 
-        self.trainer = Trainer()
+        self.trainer = Trainer(model, args)
 
         self._init_clients()
 
     def _init_clients(self):
         for client_idx in range(self.total_num_clients):
-            c = Client(client_idx, self.train_data[client_idx], self.test_data[client_idx], self.device)
+            c = Client(client_idx, self.train_data[client_idx], self.test_data[client_idx], self.model, self.args)
             self.client_list.append(c)
 
     def _client_selection(self, method='AFL'):

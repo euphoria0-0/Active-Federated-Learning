@@ -7,6 +7,7 @@ paper:
 unofficial implementation:
     https://github.com/euphoria0-0
 '''
+import os
 import wandb
 import argparse
 import torch
@@ -34,9 +35,9 @@ def get_args():
     return args
 
 
-def load_data(dataset, data_dir):
-    if dataset == 'Reddit':
-        return RedditDataset(data_dir).dataset
+def load_data(args):
+    if args.dataset == 'Reddit':
+        return RedditDataset(args.data_dir, args.device).dataset
 
 
 def create_model(model):
@@ -56,8 +57,11 @@ if __name__ == '__main__':
     torch.cuda.set_device(args.device)  # change allocation of current GPU
     print('Current cuda device: {}'.format(torch.cuda.current_device()))
 
+    #torch.backends.cudnn.enabled = False
+    #os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
     # set data
-    dataset = load_data(args.dataset, args.data_dir)
+    dataset = load_data(args)
 
     # set model
     model = create_model(args.model)
@@ -65,7 +69,7 @@ if __name__ == '__main__':
     trainer = Trainer(model, args)
 
     # set federated optim algorithm
-    FedAPI = Server(dataset, args.device, method='random')
+    FedAPI = Server(dataset, model, args, method='random')
 
     # train
     FedAPI.train()

@@ -10,63 +10,64 @@ from tqdm import tqdm
 
 
 class RedditDataset:
-    def __init__(self, data_dir, num_traindata=None):
+    def __init__(self, data_dir, device):
         self.num_classes = 2
         self.train_size = 124638 # messages
         self.test_size = 15568 # messages
         self.train_num_clients = 7656 # 7527 # users
         self.test_num_clients = 3440 # users
         self.batch_size = 64
+        self.maxlen = 500
+        self.device = device
 
-        self._init_data(data_dir, num_traindata)
+        self._init_data(data_dir)
+        print(f'Total number of users: {self.train_num_clients}')
 
 
-    def _update_data(self, additional_idx):
+    '''def _update_data(self, additional_idx):
         self.current_idx += additional_idx
-        self.data = self.train_data[self.current_idx]
+        self.data = self.train_data[self.current_idx]'''
 
-    def _init_data(self, data_dir, num_traindata):
+    def _init_data(self, data_dir):
         if os.path.isfile(os.path.join(data_dir, 'Reddit_preprocessed_7656_.json')):
             #print('>> get preprocessed Reddit dataset ...')
             with open(os.path.join(data_dir, 'Reddit_preprocessed_7656_.json'), 'r') as f:
                 dataset = json.load(f) # user_id, num_data, text, label
+
+            train_data_num, test_data_num = 0, 0
+            train_data_local_dict, test_data_local_dict = dict(), dict()
+            train_data_local_num_dict = dict()
+            train_data_global, test_data_global = list(), list()
+            for client_idx in tqdm(range(self.train_num_clients), desc='>> Split data to clients'):
+                user_train_data_num = dataset[str(client_idx)]['num_data']
+                #user_test_data_num = dataset[client_idx]['num_data']
+                train_data_num += user_train_data_num
+                #test_data_num += user_test_data_num
+                train_data_local_num_dict[client_idx] = user_train_data_num
+
+                # transform to batches
+                train_batch = self._batch_data(dataset[str(client_idx)])
+                #test_batch = self._batch_data()
+
+                # index using client index
+                train_data_local_dict[client_idx] = train_batch
+                #test_data_local_dict[client_idx] = test_batch
+                train_data_global += train_batch
+                #test_data_global += test_batch
+
+            dataset = {}
+            dataset['train'] = {
+                'data_sizes': train_data_local_num_dict,
+                'data': train_data_local_dict
+            }
+            dataset['test'] = {
+                'data_sizes': train_data_num,
+                'data': train_data_global
+            }
+
+            self.dataset = dataset
         else:
-            dataset = self._preprocess(data_dir)
-
-        print(f'Total number of users: {self.train_num_clients}')
-
-        train_data_num, test_data_num = 0, 0
-        train_data_local_dict, test_data_local_dict = dict(), dict()
-        train_data_local_num_dict = dict()
-        train_data_global, test_data_global = list(), list()
-        for client_idx in tqdm(range(self.train_num_clients), desc='>> Split data to clients: '):
-            user_train_data_num = dataset[str(client_idx)]['num_data']
-            #user_test_data_num = dataset[client_idx]['num_data']
-            train_data_num += user_train_data_num
-            #test_data_num += user_test_data_num
-            train_data_local_num_dict[client_idx] = user_train_data_num
-
-            # transform to batches
-            train_batch = self._batch_data(dataset[str(client_idx)])
-            #test_batch = self._batch_data()
-
-            # index using client index
-            train_data_local_dict[client_idx] = train_batch
-            #test_data_local_dict[client_idx] = test_batch
-            train_data_global += train_batch
-            #test_data_global += test_batch
-
-        dataset = {}
-        dataset['train'] = {
-            'data_sizes': train_data_local_num_dict,
-            'data': train_data_local_dict
-        }
-        dataset['test'] = {
-            'data_sizes': train_data_num,
-            'data': train_data_global
-        }
-
-        self.dataset = dataset
+            self.dataset = self._preprocess(data_dir)
 
     def _batch_data(self, data):
         '''
@@ -101,14 +102,16 @@ class RedditDataset:
         for word in raw_x_batch:
             indices = torch.empty((0,), dtype=torch.long)
             for c in word:
-                tmp = torch.tensor([ALL_LETTERS.find(c)], dtype=torch.long)
+                tmp = ALL_LETTERS.find(c)
+                tmp = 0 if tmp == -1 else tmp
+                tmp = torch.tensor([tmp], dtype=torch.long)
                 indices = torch.cat((indices, tmp), dim=0)
             x_batch.append(indices)
-        maxlen = max([x.size(0) for x in x_batch])
+        #maxlen = max([x.size(0) for x in x_batch])
 
-        x_batch2 = torch.empty((0, maxlen), dtype=torch.long)
+        x_batch2 = torch.empty((0, self.maxlen), dtype=torch.long)
         for x in x_batch:
-            x = torch.unsqueeze(F.pad(x, (0, maxlen-x.size(0)), value=-1), 0)
+            x = torch.unsqueeze(F.pad(x, (0, self.maxlen-x.size(0)), value=0), 0)
             x_batch2 = torch.cat((x_batch2, x), dim=0)
         return x_batch2
 
@@ -116,7 +119,7 @@ class RedditDataset:
         print('>> load and preprocess data ... WARNING ... it will take about 16 hours ...')
         users, dataset = {}, {}
         num_user = 0
-        with bz2.BZ2File('D:/data/Reddit/RC_2017-11.bz2', 'r') as f:
+        with bz2.BZ2File(os.path.join(data_dir, 'RC_2017-11.bz2'), 'r') as f:
             for i, line in tqdm(enumerate(f)):
                 if i > 100000: break
                 line = json.loads(line.rstrip())
