@@ -10,6 +10,7 @@ unofficial implementation:
 import wandb
 import argparse
 import torch
+from torch.utils.data import DataLoader
 
 from data.reddit import RedditDataset
 from model.BLSTM import BLSTM
@@ -35,7 +36,8 @@ def get_args():
 
 def load_data(dataset, data_dir):
     if dataset == 'Reddit':
-        return RedditDataset(data_dir)
+        return RedditDataset(data_dir).dataset
+
 
 def create_model(model):
     if model == 'BLSTM':
@@ -55,7 +57,7 @@ if __name__ == '__main__':
     print('Current cuda device: {}'.format(torch.cuda.current_device()))
 
     # set data
-    data = load_data(args.dataset, args.data_dir)
+    dataset = load_data(args.dataset, args.data_dir)
 
     # set model
     model = create_model(args.model)
@@ -63,7 +65,7 @@ if __name__ == '__main__':
     trainer = Trainer(model, args)
 
     # set federated optim algorithm
-    FedAPI = Server(data, args.device, method='random')
+    FedAPI = Server(dataset, args.device, method='random')
 
     # train
     FedAPI.train()

@@ -8,11 +8,10 @@ from FL_core.client_selection import ClientSelection, ActiveFederatedLearning
 
 class Server(object):
     def __init__(self, data, device, method='random'):
-        train_data, test_data, train_sizes, test_sizes = data
-        self.train_data = train_data
-        self.train_sizes = train_sizes
-        self.test_data = test_data
-        self.test_sizes = test_sizes
+        self.train_data = data['train']['data']
+        self.train_sizes = data['train']['data_sizes']
+        self.test_data = data['test']['data']
+        self.test_sizes = data['test']['data_sizes']
         self.method = method
         self.device = device
 
