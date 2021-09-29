@@ -12,11 +12,11 @@ class Client(object):
     def train(self, global_model, tracking=True):
         self.trainer.set_model_params(global_model)
         model, acc, loss = self.trainer.train(self.local_train_data, tracking)
-        return model, acc, loss
+        return model.cpu(), acc, loss
 
     def test(self, mode='test'):
         if mode == 'train':
-            acc, loss = self.trainer.test(self.local_train_data)
+            acc, loss, auc = self.trainer.test(self.local_train_data)
         else:
-            acc, loss = self.trainer.test(self.local_test_data)
-        return {'loss': loss, 'acc': acc}
+            acc, loss, auc = self.trainer.test(self.local_test_data)
+        return {'loss': loss, 'acc': acc, 'auc': auc}

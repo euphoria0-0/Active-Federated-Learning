@@ -2,6 +2,8 @@ import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
+from sklearn.metrics import roc_auc_score
 
 
 class Trainer:
@@ -12,6 +14,7 @@ class Trainer:
         self.lr = args.lr_local
         self.wdecay = args.wdecay
         self.num_epoch = args.num_epoch
+        self.binary = True if args.dataset == 'Reddit' else False
 
     def get_model_params(self):
         return self.model.cpu().state_dict()
@@ -24,7 +27,10 @@ class Trainer:
         model = model.to(self.device)
         model.train()
 
-        criterion = nn.BCEWithLogitsLoss().to(self.device)
+        if self.binary:
+            criterion = nn.BCEWithLogitsLoss().to(self.device)
+        else:
+            criterion = nn.CrossEntropyLoss().to(self.device)
         if self.client_optimizer == 'sgd':
             optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
         else:
@@ -59,10 +65,14 @@ class Trainer:
         model = self.model.to(self.device)
         model.eval()
 
-        criterion = nn.BCEWithLogitsLoss().to(self.device)
+        if self.binary:
+            criterion = nn.BCEWithLogitsLoss().to(self.device)
+        else:
+            criterion = nn.CrossEntropyLoss().to(self.device)
 
         with torch.no_grad():
             test_loss, correct, total = 0., 0, 0
+            y_true, y_score = np.empty((0)), np.empty((0))
             for input, labels in data:
                 input, labels = input.to(self.device), labels.to(self.device)
                 output = model(input)
@@ -73,9 +83,14 @@ class Trainer:
                 correct += preds.eq(labels).sum()
                 total += input.size(0)
 
+                y_true = np.append(y_true, labels.cpu().numpy(), axis=0)
+                y_score = np.append(y_score, preds.cpu().numpy(), axis=0)
+
+        auc = roc_auc_score(y_true, y_score)
+
         if total > 0:
             test_loss /= total
             test_acc = correct / total
         else:
             test_acc = correct
-        return test_acc, test_loss
+        return test_acc, test_loss, auc

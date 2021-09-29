@@ -54,6 +54,7 @@ class ActiveFederatedLearning(ClientSelection):
         probs[client_idxs] = 0
         # 2) select 99% of m users using prob.
         num_select = int((1 - self.alpha3) * self.budget)
+        np.random.seed(seed)
         selected = np.random.choice(self.total, num_select, p=probs/sum(probs), replace=False)
         # 3) select 1% of m users randomly
         not_selected = np.array(list(set(np.arange(self.total)) - set(selected)))

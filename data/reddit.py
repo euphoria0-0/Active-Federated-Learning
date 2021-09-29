@@ -10,14 +10,14 @@ from tqdm import tqdm
 
 
 class RedditDataset:
-    def __init__(self, data_dir, batch_size=128, maxlen=500):
+    def __init__(self, data_dir, args):
         self.num_classes = 2
-        self.train_size = 124638 # messages
-        self.test_size = 15568 # messages
-        self.train_num_clients = 7656 # 7527 # users
-        self.test_num_clients = 3440 # users
-        self.batch_size = batch_size
-        self.maxlen = maxlen
+        #self.train_size = 124638 # messages
+        #self.test_size = 15568 # messages
+        self.train_num_clients = args.total_num_client # 7656 # 7527 (paper)
+        self.test_num_clients = args.test_num_clients # 3440
+        self.batch_size = args.batch_size #128
+        self.maxlen = args.maxlen #500
 
         self._init_data(data_dir)
         print(f'Total number of users: {self.train_num_clients}')

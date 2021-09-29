@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch
 
 
 class BLSTM(nn.Module):
@@ -8,7 +7,7 @@ class BLSTM(nn.Module):
         # AFL: 64-dim embedding, 32-dim BLSTM, MLP with one layer(64-dim)
         self.embeddings = nn.Embedding(num_embeddings=vocab_size, embedding_dim=embedding_dim, padding_idx=0)
         self.blstm = nn.LSTM(input_size=embedding_dim, hidden_size=blstm_hidden_size, num_layers=blstm_num_layers,
-                             batch_first=True, bidirectional=True) #
+                             batch_first=True, bidirectional=True)
         self.fc1 = nn.Linear(blstm_hidden_size*2, mlp_hidden_size)
         self.fc2 = nn.Linear(mlp_hidden_size, 1)
 

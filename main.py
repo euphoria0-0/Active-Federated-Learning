@@ -54,7 +54,7 @@ def get_args():
 
 def load_data(args):
     if args.dataset == 'Reddit':
-        return RedditDataset(args.data_dir, args.batch_size, args.maxlen).dataset
+        return RedditDataset(args.data_dir, args).dataset
 
 
 def create_model(args):
@@ -79,7 +79,6 @@ if __name__ == '__main__':
 
     # set model
     model = create_model(args)
-    print(model)
     trainer = Trainer(model, args)
 
     # set federated optim algorithm

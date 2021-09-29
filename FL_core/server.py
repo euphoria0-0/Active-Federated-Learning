@@ -4,6 +4,7 @@ from copy import deepcopy
 from tqdm import tqdm
 import numpy as np
 import sys
+from collections import OrderedDict
 
 from FL_core.client import Client
 from FL_core.trainer import Trainer
@@ -27,6 +28,12 @@ class Server(object):
         self.num_clients_per_round = args.num_clients_per_round
         self.test_num_clients = args.test_num_clients if args.test_num_clients is not None else args.total_num_client
         self.total_round = args.num_round
+
+        if self.fed_algo == 'FedAdam':
+            self.m = OrderedDict()
+            self.v = OrderedDict()
+            for k in model.state_dict():
+                self.m[k], self.v[k] = 0., 0.
 
         self.trainer = Trainer(model, args)
 
@@ -54,28 +61,27 @@ class Server(object):
                         update_model[k] = weight * local_model.cpu().state_dict()[k]
                     else:
                         update_model[k] += weight * local_model.cpu().state_dict()[k]
+
         elif self.fed_algo == 'FedAdam':
-            m, v = 0., 0.
-            global_model = deepcopy(global_model.cpu().state_dict())
-            update_model = deepcopy(local_models[0].cpu().state_dict())
-            for k in update_model.keys():
+            gradient_update = OrderedDict()
+            for k in global_model.keys():
                 for idx in range(len(local_models)):
-                    local_model = deepcopy(local_models[idx])
+                    local_model = deepcopy(local_models[idx]).state_dict()
                     num_local_data = self.train_sizes[client_indices[idx]]
                     weight = num_local_data / sum(self.train_sizes)
-
-                    gradient_update = global_model - local_model
-
                     if idx == 0:
-                        update_model[k] = weight * gradient_update
+                        gradient_update[k] = weight * local_model[k]
                     else:
-                        update_model[k] += weight * gradient_update
+                        gradient_update[k] -= weight * local_model[k]
 
-            m = self.args.beta1 * m + (1 - self.args.beta1) * update_model
-            v = self.args.beta2 * v + (1 - self.args.beta2) * (update_model ** 2)
-            m_hat = m / (1 - self.args.beta1)
-            v_hat = v / (1 - self.args.beta2)
-            update_model = global_model - self.args.lr_global * m_hat / (np.sqrt(v_hat) + self.args.epsilon)
+            update_model = OrderedDict()
+            for k in gradient_update.keys():
+                g = gradient_update[k]
+                self.m[k] = self.args.beta1 * self.m[k] + (1 - self.args.beta1) * g
+                self.v[k] = self.args.beta2 * self.v[k] + (1 - self.args.beta2) * torch.mul(g, g)
+                m_hat = self.m[k] / (1 - self.args.beta1)
+                v_hat = self.v[k] / (1 - self.args.beta2)
+                update_model[k] = global_model[k] - self.args.lr_global * m_hat / (np.sqrt(v_hat) + self.args.epsilon)
 
         return update_model
 
@@ -125,16 +131,18 @@ class Server(object):
     def test(self):
         num_test_clients = self.total_num_client
 
-        metrics = {'loss': [], 'acc': []}
+        metrics = {'loss': [], 'acc': [], 'auc': []}
         for client_idx in tqdm(range(num_test_clients), desc='>> Local testing'):
             client = self.client_list[client_idx]
             result = client.test('test')
             metrics['loss'].append(result['loss'])
             metrics['acc'].append(result['acc'])
-            sys.stdout.write('\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(client_idx, num_test_clients,
-                                                                                      result['loss'], result['acc']))
+            metrics['auc'].append(result['auc'])
+            sys.stdout.write('\rClient {}/{} TestLoss {:.6f} TestAcc {:.4f} TestAUC {:.4f}'.format(client_idx, num_test_clients,
+                                                                                                   result['loss'], result['acc'], result['auc']))
 
         wandb.log({
             'Test/Loss': sum(metrics['loss']) / num_test_clients,
-            'Test/Acc': sum(metrics['acc']) / num_test_clients
+            'Test/Acc': sum(metrics['acc']) / num_test_clients,
+            'Test/AUC': sum(metrics['auc']) / num_test_clients
         })
