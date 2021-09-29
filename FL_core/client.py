@@ -9,9 +9,9 @@ class Client(object):
         self.device = args.device
         self.trainer = Trainer(model, args)
 
-    def train(self, global_model):
+    def train(self, global_model, tracking=True):
         self.trainer.set_model_params(global_model)
-        model, acc, loss = self.trainer.train(self.local_train_data)
+        model, acc, loss = self.trainer.train(self.local_train_data, tracking)
         return model, acc, loss
 
     def test(self, mode='test'):

@@ -10,15 +10,14 @@ from tqdm import tqdm
 
 
 class RedditDataset:
-    def __init__(self, data_dir, device):
+    def __init__(self, data_dir, batch_size=128, maxlen=500):
         self.num_classes = 2
         self.train_size = 124638 # messages
         self.test_size = 15568 # messages
         self.train_num_clients = 7656 # 7527 # users
         self.test_num_clients = 3440 # users
-        self.batch_size = 128
-        self.maxlen = 500
-        self.device = device
+        self.batch_size = batch_size
+        self.maxlen = maxlen
 
         self._init_data(data_dir)
         print(f'Total number of users: {self.train_num_clients}')
@@ -80,9 +79,10 @@ class RedditDataset:
                 'data': train_data_local_dict
             }
             dataset['test'] = {
-                'data_sizes': test_data_num,
+                'data_sizes': test_data_num, # 7488
                 'data': test_data_local_dict
             }
+            torch.save(dataset, 'D:/data/Reddit/preprocess.pth')
 
             self.dataset = dataset
         else:

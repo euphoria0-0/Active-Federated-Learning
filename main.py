@@ -22,16 +22,30 @@ from FL_core.server import Server
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu_id', type=str, default='0', help='gpu cuda index')
-    parser.add_argument('--dataset', type=str, default='Reddit', help='dataset')
+    parser.add_argument('--dataset', type=str, default='Reddit', help='dataset', choices=['Reddit'])
     parser.add_argument('--data_dir', type=str, default='D:/data/Reddit/', help='dataset directory')
-    parser.add_argument('--model', type=str, default='BLSTM', help='model')
-    parser.add_argument('--method', type=str, default='Random', help='Random or AFL')
+    parser.add_argument('--model', type=str, default='BLSTM', help='model', choices=['BLSTM'])
+    parser.add_argument('--method', type=str, default='Random', choices=['Random', 'AFL'], help='client selection')
+    parser.add_argument('--fed_algo', type=str, default='FedAvg', choices=['FedAvg', 'FedAdam'],
+                        help='Federated algorithm for aggregation')
 
-    parser.add_argument('--client_optimizer', type=str, default='sgd', help='optimizer for client')
-    parser.add_argument('--lr', type=float, default=0.01, help='learning rate')
-    parser.add_argument('--wdecay', type=float, default=5e-4, help='learning rate')
+    parser.add_argument('--client_optimizer', type=str, default='sgd', choices=['sgd', 'adam'], help='client optim')
+    parser.add_argument('--lr_local', type=float, default=0.01, help='learning rate for optim')
+    parser.add_argument('--lr_global', type=float, default=0.001, help='learning rate for optim')
+    parser.add_argument('--wdecay', type=float, default=0, help='weight decay for optim')
+    parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for Adam')
+    parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam')
+    parser.add_argument('--epsilon', type=float, default=1e-8, help='epsilon for Adam')
 
-    parser.add_argument('--num_epoch', type=int, default=50, help='learning rate')
+    parser.add_argument('--num_epoch', type=int, default=50, help='number of epochs')
+    parser.add_argument('--batch_size', type=int, default=128, help='batch size of each client data')
+    parser.add_argument('--num_round', type=int, default=20, help='total number of rounds')
+
+    parser.add_argument('--total_num_client', type=int, default=7656, help='total number of clients')
+    parser.add_argument('--num_clients_per_round', type=int, default=200, help='number of participated clients')
+    parser.add_argument('--test_num_clients', type=int, default=None, help='number of participated clients for test')
+
+    parser.add_argument('--maxlen', type=int, default=500, help='maxlen for NLP dataset')
 
     #parser.add_argument('--comment', type=str, default='', help='comment')
     args = parser.parse_args()
@@ -40,12 +54,12 @@ def get_args():
 
 def load_data(args):
     if args.dataset == 'Reddit':
-        return RedditDataset(args.data_dir, args.device).dataset
+        return RedditDataset(args.data_dir, args.batch_size, args.maxlen).dataset
 
 
-def create_model(model):
-    if model == 'BLSTM':
-        return BLSTM()
+def create_model(args):
+    if args.model == 'BLSTM':
+        return BLSTM(vocab_size=args.maxlen)
 
 
 if __name__ == '__main__':
@@ -53,7 +67,7 @@ if __name__ == '__main__':
     args = get_args()
     wandb.init(
         project=f'AFL-{args.dataset}',
-        name=f"{args.method}-lr{args.lr}",#-{args.comment}",
+        name=f"{args.method}-{args.fed_algo}-{args.num_clients_per_round}/{args.total_num_client}",#-{args.comment}",
         config=args
     )
     args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
@@ -64,12 +78,12 @@ if __name__ == '__main__':
     dataset = load_data(args)
 
     # set model
-    model = create_model(args.model)
+    model = create_model(args)
     print(model)
     trainer = Trainer(model, args)
 
     # set federated optim algorithm
-    FedAPI = Server(dataset, model, args, method=args.method.lower())
+    FedAPI = Server(dataset, model, args)
 
     # train
     FedAPI.train()

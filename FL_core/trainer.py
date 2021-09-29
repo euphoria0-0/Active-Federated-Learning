@@ -9,7 +9,7 @@ class Trainer:
         self.model = model
         self.device = args.device
         self.client_optimizer = args.client_optimizer
-        self.lr = args.lr
+        self.lr = args.lr_local
         self.wdecay = args.wdecay
         self.num_epoch = args.num_epoch
 
@@ -19,7 +19,7 @@ class Trainer:
     def set_model_params(self, model_params):
         self.model.load_state_dict(model_params)
 
-    def train(self, data):
+    def train(self, data, tracking=True):
         model = self.model
         model = model.to(self.device)
         model.train()
@@ -28,7 +28,7 @@ class Trainer:
         if self.client_optimizer == 'sgd':
             optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
         else:
-            optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.wdecay, amsgrad=True)
+            optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
 
         for epoch in range(self.num_epoch):
             train_loss, correct, total = 0., 0, 0
@@ -50,9 +50,10 @@ class Trainer:
             train_loss = train_loss / total
             sys.stdout.write('\rEpoch {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(epoch+1, self.num_epoch,
                                                                                      train_loss, train_acc))
-        print()
+        if tracking:
+            print()
 
-        return model, train_acc, train_loss
+        return model, train_acc, train_loss.cpu().detach()
 
     def test(self, data):
         model = self.model.to(self.device)
@@ -77,5 +78,4 @@ class Trainer:
             test_acc = correct / total
         else:
             test_acc = correct
-        print('TestLoss {:.6f} TestAcc {:.4f}'.format(test_loss, test_acc))
         return test_acc, test_loss
