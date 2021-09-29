@@ -11,12 +11,12 @@ class Client(object):
 
     def train(self, global_model):
         self.trainer.set_model_params(global_model)
-        model, _, loss = self.trainer.train(self.local_train_data)
-        return model, loss
+        model, acc, loss = self.trainer.train(self.local_train_data)
+        return model, acc, loss
 
     def test(self, mode='test'):
         if mode == 'train':
-            loss, acc = self.trainer.test(self.local_train_data)
+            acc, loss = self.trainer.test(self.local_train_data)
         else:
-            loss, acc = self.trainer.test(self.local_test_data)
+            acc, loss = self.trainer.test(self.local_test_data)
         return {'loss': loss, 'acc': acc}

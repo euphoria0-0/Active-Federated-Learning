@@ -31,7 +31,7 @@ class Trainer:
             optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.wdecay, amsgrad=True)
 
         for epoch in range(self.num_epoch):
-            train_loss, correct, total = 0, 0, 0
+            train_loss, correct, total = 0., 0, 0
             for input, labels in data:
                 input, labels = input.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
@@ -61,19 +61,21 @@ class Trainer:
         criterion = nn.BCEWithLogitsLoss().to(self.device)
 
         with torch.no_grad():
-            for epoch in range(self.num_epoch):
-                test_loss, correct, total = 0, 0, 0
-                for input, labels in data:
-                    input, labels = input.to(self.device), labels.to(self.device)
-                    output = model(input)
-                    loss = criterion(output, labels.unsqueeze(1).type_as(output))
-                    _, preds = torch.max(output.data, 1)
+            test_loss, correct, total = 0., 0, 0
+            for input, labels in data:
+                input, labels = input.to(self.device), labels.to(self.device)
+                output = model(input)
+                loss = criterion(output, labels.unsqueeze(1).type_as(output))
+                _, preds = torch.max(output.data, 1)
 
-                    test_loss += torch.sum(loss)
-                    correct += preds.eq(labels).sum()
-                    total += input.size(0)
+                test_loss += loss.item()
+                correct += preds.eq(labels).sum()
+                total += input.size(0)
 
-        test_loss = test_loss / total
-        test_acc = correct / total
+        if total > 0:
+            test_loss /= total
+            test_acc = correct / total
+        else:
+            test_acc = correct
         print('TestLoss {:.6f} TestAcc {:.4f}'.format(test_loss, test_acc))
         return test_acc, test_loss

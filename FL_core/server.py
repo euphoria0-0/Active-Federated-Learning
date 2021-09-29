@@ -66,12 +66,18 @@ class Server(object):
                 client_indices = [*range(self.total_num_clients)]
 
             # local training
-            local_models, local_losses = [], []
+            local_models, local_losses, accuracy = [], [], 0
             for client_idx in client_indices:
                 client = self.client_list[client_idx]
-                local_model, local_loss = client.train(deepcopy(global_model))
+                local_model, local_acc, local_loss = client.train(deepcopy(global_model))
                 local_models.append(deepcopy(local_model))
                 local_losses.append(local_loss)
+                accuracy += local_acc
+
+            wandb.log({
+                'Train/Loss': sum(local_losses) / len(client_indices),
+                'Train/Acc': accuracy / len(client_indices)
+            })
 
             # client selection
             if self.method != 'random':
@@ -87,20 +93,18 @@ class Server(object):
             self.trainer.set_model_params(global_model)
 
             # test
-            #self._test(round_idx)
+            self._test(round_idx)
 
 
     def _test(self, round_idx):
-        #for mode in ['Train', 'Test']:
-        #datasize = sum(self.train_sizes) if mode == 'Train' else sum(self.test_sizes)
         metrics = {'loss': [], 'acc': []}
-        for client_idx in range(100):#self.total_num_clients
+        for client_idx in range(100): #self.total_num_clients
             client = self.client_list[client_idx]
             result = client.test('test')
-            metrics['loss'].append(result['loss'].item())
-            metrics['acc'].append(result['acc'].item())
+            metrics['loss'].append(result['loss'])
+            metrics['acc'].append(result['acc'])
 
-        '''wandb.log({
-            'Test/Loss': sum(metrics['loss']) / datasize,
-            'Test/Acc': sum(metrics['acc']) / datasize
-        })'''
+        wandb.log({
+            'Test/Loss': sum(metrics['loss']) / 100,
+            'Test/Acc': sum(metrics['acc']) / 100
+        })

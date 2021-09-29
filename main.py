@@ -32,6 +32,8 @@ def get_args():
     parser.add_argument('--wdecay', type=float, default=5e-4, help='learning rate')
 
     parser.add_argument('--num_epoch', type=int, default=50, help='learning rate')
+
+    #parser.add_argument('--comment', type=str, default='', help='comment')
     args = parser.parse_args()
     return args
 
@@ -49,11 +51,11 @@ def create_model(model):
 if __name__ == '__main__':
     # set up
     args = get_args()
-    '''wandb.init(
-        project=f'AFL-{args.data}',
-        name=f"{args.method}-lr{args.lr}-{args.comment}",
+    wandb.init(
+        project=f'AFL-{args.dataset}',
+        name=f"{args.method}-lr{args.lr}",#-{args.comment}",
         config=args
-    )'''
+    )
     args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(args.device)  # change allocation of current GPU
     print('Current cuda device: {}'.format(torch.cuda.current_device()))

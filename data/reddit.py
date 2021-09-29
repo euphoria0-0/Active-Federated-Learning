@@ -37,22 +37,42 @@ class RedditDataset:
             train_data_num, test_data_num = 0, 0
             train_data_local_dict, test_data_local_dict = dict(), dict()
             train_data_local_num_dict = dict()
-            train_data_global, test_data_global = list(), list()
+            #train_data_global, test_data_global = list(), list()
             for client_idx in tqdm(range(self.train_num_clients), desc='>> Split data to clients'):
-                user_train_data_num = dataset[str(client_idx)]['num_data']
+                local_data = dataset[str(client_idx)]
+                user_train_data_num = local_data['num_data']
+                #train_data_num += user_train_data_num
+                #train_data_local_num_dict[client_idx] = user_train_data_num
 
+                #
                 # split train, test
-                train_idx = 0
+                num_train = int(0.9 * user_train_data_num) if user_train_data_num >= 10 else user_train_data_num
+                num_test = user_train_data_num - num_train if user_train_data_num >= 10 else 0
 
-                train_data_num += user_train_data_num
-                train_data_local_num_dict[client_idx] = user_train_data_num
+                train_data_num += num_train
+                test_data_num += num_test
+                train_data_local_num_dict[client_idx] = num_train
 
-                # transform to batches
+                np.random.seed(0)
+                train_indices = np.random.choice(user_train_data_num, num_train, replace=False)
+                test_indices = np.array(list(set(np.arange(user_train_data_num)) - set(train_indices)))
+
+                train_data = self._batch_data(local_data, train_indices)
+                if num_test > 0:
+                    test_data = self._batch_data(local_data, test_indices)
+                else:
+                    test_data = np.array([])
+
+                train_data_local_dict[client_idx] = train_data
+                test_data_local_dict[client_idx] = test_data
+                #
+
+                '''# transform to batches
                 train_batch = self._batch_data(dataset[str(client_idx)])
 
                 # index using client index
                 train_data_local_dict[client_idx] = train_batch
-                train_data_global += train_batch
+                train_data_global += train_batch'''
 
             dataset = {}
             dataset['train'] = {
@@ -60,21 +80,21 @@ class RedditDataset:
                 'data': train_data_local_dict
             }
             dataset['test'] = {
-                'data_sizes': train_data_num,
-                'data': train_data_global
+                'data_sizes': test_data_num,
+                'data': test_data_local_dict
             }
 
             self.dataset = dataset
         else:
             self.dataset = preprocess(data_dir)
 
-    def _batch_data(self, data):
+    def _batch_data(self, data, indices):
         '''
         data is a dict := {'x': [numpy array], 'y': [numpy array]} (on one client)
         returns x, y, which are both numpy array of length: batch_size
         '''
-        data_x = data['text']
-        data_y = data['label']
+        data_x = np.array(data['text'])[indices]
+        data_y = np.array(data['label'])[indices]
 
         # randomly shuffle data
         np.random.seed(0)
