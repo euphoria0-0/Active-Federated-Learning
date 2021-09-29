@@ -117,7 +117,6 @@ class Server(object):
                                                     self.total_num_client, self.num_clients_per_round, self.device)
                 selected_client_indices = selection_method.select(round_idx)
                 local_models = [local_models[i] for i in selected_client_indices]
-                #print(type(client_indices), type(selected_client_indices))
                 client_indices = np.array(client_indices)[selected_client_indices.astype(int)].tolist()
 
             # update global model

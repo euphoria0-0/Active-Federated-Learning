@@ -86,7 +86,10 @@ class Trainer:
                 y_true = np.append(y_true, labels.cpu().numpy(), axis=0)
                 y_score = np.append(y_score, preds.cpu().numpy(), axis=0)
 
-        auc = roc_auc_score(y_true, y_score)
+        try:
+            auc = roc_auc_score(y_true, y_score)
+        except:
+            auc = 0
 
         if total > 0:
             test_loss /= total
