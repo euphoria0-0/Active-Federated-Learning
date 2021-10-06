@@ -14,7 +14,7 @@ class Trainer:
         self.lr = args.lr_local
         self.wdecay = args.wdecay
         self.num_epoch = args.num_epoch
-        self.binary = True if args.dataset == 'Reddit' else False
+
 
     def get_model_params(self):
         return self.model.cpu().state_dict()
@@ -27,10 +27,8 @@ class Trainer:
         model = model.to(self.device)
         model.train()
 
-        if self.binary:
-            criterion = nn.BCEWithLogitsLoss().to(self.device)
-        else:
-            criterion = nn.CrossEntropyLoss().to(self.device)
+        criterion = nn.CrossEntropyLoss().to(self.device)
+
         if self.client_optimizer == 'sgd':
             optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
         else:
@@ -42,7 +40,8 @@ class Trainer:
                 input, labels = input.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
                 output = model(input)
-                loss = criterion(output, labels.unsqueeze(1).type_as(output))
+                #loss = criterion(output, labels.unsqueeze(1).type_as(output))
+                loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
                 train_loss += torch.sum(loss)
@@ -53,11 +52,12 @@ class Trainer:
                 optimizer.step()
 
             train_acc = correct / total
-            train_loss = train_loss / total
+            train_loss = train_loss / np.sqrt(total)
             sys.stdout.write('\rEpoch {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(epoch+1, self.num_epoch,
                                                                                      train_loss, train_acc))
         if tracking:
             print()
+        self.model = model
 
         return model, train_acc, train_loss.cpu().detach()
 
@@ -65,10 +65,7 @@ class Trainer:
         model = self.model.to(self.device)
         model.eval()
 
-        if self.binary:
-            criterion = nn.BCEWithLogitsLoss().to(self.device)
-        else:
-            criterion = nn.CrossEntropyLoss().to(self.device)
+        criterion = nn.CrossEntropyLoss().to(self.device)
 
         with torch.no_grad():
             test_loss, correct, total = 0., 0, 0
@@ -76,7 +73,8 @@ class Trainer:
             for input, labels in data:
                 input, labels = input.to(self.device), labels.to(self.device)
                 output = model(input)
-                loss = criterion(output, labels.unsqueeze(1).type_as(output))
+                #loss = criterion(output, labels.unsqueeze(1).type_as(output))
+                loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
                 test_loss += loss.item()

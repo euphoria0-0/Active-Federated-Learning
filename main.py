@@ -37,15 +37,15 @@ def get_args():
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam')
     parser.add_argument('--epsilon', type=float, default=1e-8, help='epsilon for Adam')
 
-    parser.add_argument('--num_epoch', type=int, default=50, help='number of epochs')
+    parser.add_argument('--num_epoch', type=int, default=2, help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size of each client data')
     parser.add_argument('--num_round', type=int, default=20, help='total number of rounds')
 
-    parser.add_argument('--total_num_client', type=int, default=7656, help='total number of clients')
+    parser.add_argument('--total_num_client', type=int, default=7668, help='total number of clients')
     parser.add_argument('--num_clients_per_round', type=int, default=200, help='number of participated clients')
     parser.add_argument('--test_num_clients', type=int, default=None, help='number of participated clients for test')
 
-    parser.add_argument('--maxlen', type=int, default=500, help='maxlen for NLP dataset')
+    parser.add_argument('--maxlen', type=int, default=400, help='maxlen for NLP dataset')
 
     #parser.add_argument('--comment', type=str, default='', help='comment')
     args = parser.parse_args()
@@ -54,12 +54,12 @@ def get_args():
 
 def load_data(args):
     if args.dataset == 'Reddit':
-        return RedditDataset(args.data_dir, args).dataset
+        return RedditDataset(args.data_dir, args)
 
 
 def create_model(args):
     if args.model == 'BLSTM':
-        return BLSTM(vocab_size=args.maxlen)
+        return BLSTM(vocab_size=args.maxlen, num_classes=args.num_classes)
 
 
 if __name__ == '__main__':
@@ -75,7 +75,9 @@ if __name__ == '__main__':
     print('Current cuda device: {}'.format(torch.cuda.current_device()))
 
     # set data
-    dataset = load_data(args)
+    data = load_data(args)
+    args.num_classes = data.num_classes
+    dataset = data.dataset
 
     # set model
     model = create_model(args)

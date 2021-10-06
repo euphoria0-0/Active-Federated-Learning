@@ -1,6 +1,6 @@
 import os
 import bz2
-import json
+import pickle
 import sys
 
 import numpy as np
@@ -14,10 +14,10 @@ class RedditDataset:
         self.num_classes = 2
         #self.train_size = 124638 # messages
         #self.test_size = 15568 # messages
-        self.train_num_clients = args.total_num_client # 7656 # 7527 (paper)
-        self.test_num_clients = args.test_num_clients # 3440
+        self.train_num_clients = args.total_num_client # 7668 # 7527 (paper)
+        self.test_num_clients = args.test_num_clients # 2099
         self.batch_size = args.batch_size #128
-        self.maxlen = args.maxlen #500
+        self.maxlen = args.maxlen #400
 
         self._init_data(data_dir)
         print(f'Total number of users: {self.train_num_clients}')
@@ -28,65 +28,14 @@ class RedditDataset:
         self.data = self.train_data[self.current_idx]'''
 
     def _init_data(self, data_dir):
-        if os.path.isfile(os.path.join(data_dir, 'Reddit_preprocessed_7656_.json')):
-            #print('>> get preprocessed Reddit dataset ...')
-            with open(os.path.join(data_dir, 'Reddit_preprocessed_7656_.json'), 'r') as f:
-                dataset = json.load(f) # user_id, num_data, text, label
-
-            train_data_num, test_data_num = 0, 0
-            train_data_local_dict, test_data_local_dict = dict(), dict()
-            train_data_local_num_dict = dict()
-            #train_data_global, test_data_global = list(), list()
-            for client_idx in tqdm(range(self.train_num_clients), desc='>> Split data to clients'):
-                local_data = dataset[str(client_idx)]
-                user_train_data_num = local_data['num_data']
-                #train_data_num += user_train_data_num
-                #train_data_local_num_dict[client_idx] = user_train_data_num
-
-                #
-                # split train, test
-                num_train = int(0.9 * user_train_data_num) if user_train_data_num >= 10 else user_train_data_num
-                num_test = user_train_data_num - num_train if user_train_data_num >= 10 else 0
-
-                train_data_num += num_train
-                test_data_num += num_test
-                train_data_local_num_dict[client_idx] = num_train
-
-                np.random.seed(0)
-                train_indices = np.random.choice(user_train_data_num, num_train, replace=False)
-                test_indices = np.array(list(set(np.arange(user_train_data_num)) - set(train_indices)))
-
-                train_data = self._batch_data(local_data, train_indices)
-                if num_test > 0:
-                    test_data = self._batch_data(local_data, test_indices)
-                else:
-                    test_data = np.array([])
-
-                train_data_local_dict[client_idx] = train_data
-                test_data_local_dict[client_idx] = test_data
-                #
-
-                '''# transform to batches
-                train_batch = self._batch_data(dataset[str(client_idx)])
-
-                # index using client index
-                train_data_local_dict[client_idx] = train_batch
-                train_data_global += train_batch'''
-
-            dataset = {}
-            dataset['train'] = {
-                'data_sizes': train_data_local_num_dict,
-                'data': train_data_local_dict
-            }
-            dataset['test'] = {
-                'data_sizes': test_data_num, # 7488
-                'data': test_data_local_dict
-            }
-            torch.save(dataset, 'D:/data/Reddit/preprocess.pth')
-
-            self.dataset = dataset
+        file_name = os.path.join(data_dir, 'Reddit_preprocessed_7668.pickle')
+        if os.path.isfile(file_name) and self.batch_size == 128 and self.maxlen == 400:
+            with open(file_name, 'rb') as f:
+                dataset = pickle.load(f) # user_id, num_data, text, label
         else:
-            self.dataset = preprocess(data_dir)
+            dataset = preprocess(data_dir)
+        self.dataset = dataset
+
 
     def _batch_data(self, data, indices):
         '''
@@ -122,7 +71,7 @@ class RedditDataset:
             indices = torch.empty((0,), dtype=torch.long)
             for c in word:
                 tmp = ALL_LETTERS.find(c)
-                tmp = 0 if tmp == -1 else tmp
+                tmp = len(ALL_LETTERS) if tmp == -1 else tmp
                 tmp = torch.tensor([tmp], dtype=torch.long)
                 indices = torch.cat((indices, tmp), dim=0)
             x_batch.append(indices)

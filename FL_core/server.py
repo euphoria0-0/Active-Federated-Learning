@@ -17,6 +17,7 @@ class Server(object):
         self.train_sizes = data['train']['data_sizes']
         self.test_data = data['test']['data']
         self.test_sizes = data['test']['data_sizes']
+        self.test_clients = data['test']['data_sizes'].keys()
         self.method = args.method
         self.fed_algo = args.fed_algo
         self.model = model
@@ -41,7 +42,8 @@ class Server(object):
 
     def _init_clients(self):
         for client_idx in range(self.total_num_client):
-            c = Client(client_idx, self.train_data[client_idx], self.test_data[client_idx], self.model, self.args)
+            local_test_data = np.array([]) if client_idx not in self.test_clients else self.test_data[client_idx]
+            c = Client(client_idx, self.train_data[client_idx], local_test_data, self.model, self.args)
             self.client_list.append(c)
 
     def _client_selection(self, method='AFL'):
@@ -128,7 +130,7 @@ class Server(object):
 
 
     def test(self):
-        num_test_clients = self.total_num_client
+        num_test_clients = len(self.test_clients)
 
         metrics = {'loss': [], 'acc': [], 'auc': []}
         for client_idx in tqdm(range(num_test_clients), desc='>> Local testing'):
