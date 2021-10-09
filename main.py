@@ -11,20 +11,21 @@ import os
 import wandb
 import argparse
 import torch
-from torch.utils.data import DataLoader
 
-from data.reddit import RedditDataset
-from model.BLSTM import BLSTM
+from data import reddit, federated_emnist
+from model import BLSTM, CNN
 from FL_core.trainer import Trainer
 from FL_core.server import Server
+
+
 
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu_id', type=str, default='0', help='gpu cuda index')
-    parser.add_argument('--dataset', type=str, default='Reddit', help='dataset', choices=['Reddit'])
+    parser.add_argument('--dataset', type=str, default='Reddit', help='dataset', choices=['Reddit','FederatedEMNIST'])
     parser.add_argument('--data_dir', type=str, default='D:/data/Reddit/', help='dataset directory')
-    parser.add_argument('--model', type=str, default='BLSTM', help='model', choices=['BLSTM'])
+    parser.add_argument('--model', type=str, default='BLSTM', help='model', choices=['BLSTM','CNN'])
     parser.add_argument('--method', type=str, default='Random', choices=['Random', 'AFL'], help='client selection')
     parser.add_argument('--fed_algo', type=str, default='FedAvg', choices=['FedAvg', 'FedAdam'],
                         help='Federated algorithm for aggregation')
@@ -40,10 +41,7 @@ def get_args():
     parser.add_argument('--num_epoch', type=int, default=2, help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size of each client data')
     parser.add_argument('--num_round', type=int, default=20, help='total number of rounds')
-
-    parser.add_argument('--total_num_client', type=int, default=7668, help='total number of clients')
     parser.add_argument('--num_clients_per_round', type=int, default=200, help='number of participated clients')
-    parser.add_argument('--test_num_clients', type=int, default=None, help='number of participated clients for test')
 
     parser.add_argument('--maxlen', type=int, default=400, help='maxlen for NLP dataset')
 
@@ -54,22 +52,26 @@ def get_args():
 
 def load_data(args):
     if args.dataset == 'Reddit':
-        return RedditDataset(args.data_dir, args)
+        return reddit.RedditDataset(args.data_dir, args)
+    elif args.dataset == 'FederatedEMNIST':
+        return federated_emnist.FederatedEMNISTDataset(args.data_dir, args)
 
 
 def create_model(args):
     if args.model == 'BLSTM':
-        return BLSTM(vocab_size=args.maxlen, num_classes=args.num_classes)
+        return BLSTM.BLSTM(vocab_size=args.maxlen, num_classes=args.num_classes)
+    elif args.model == 'CNN':
+        return CNN.CNN_DropOut(False)
 
 
 if __name__ == '__main__':
     # set up
     args = get_args()
-    wandb.init(
+    '''wandb.init(
         project=f'AFL-{args.dataset}',
         name=f"{args.method}-{args.fed_algo}-{args.num_clients_per_round}/{args.total_num_client}",#-{args.comment}",
         config=args
-    )
+    )'''
     args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(args.device)  # change allocation of current GPU
     print('Current cuda device: {}'.format(torch.cuda.current_device()))
@@ -77,6 +79,8 @@ if __name__ == '__main__':
     # set data
     data = load_data(args)
     args.num_classes = data.num_classes
+    args.total_num_client = data.train_num_clients
+    args.test_num_clients = data.test_num_clients
     dataset = data.dataset
 
     # set model

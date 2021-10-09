@@ -1,8 +1,7 @@
 import os
-import bz2
 import pickle
-import sys
 
+import bz2
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -14,8 +13,8 @@ class RedditDataset:
         self.num_classes = 2
         #self.train_size = 124638 # messages
         #self.test_size = 15568 # messages
-        self.train_num_clients = args.total_num_client # 7668 # 7527 (paper)
-        self.test_num_clients = args.test_num_clients # 2099
+        self.train_num_clients = 7668 # 7527 (paper)
+        self.test_num_clients = 2099
         self.batch_size = args.batch_size #128
         self.maxlen = args.maxlen #400
 
@@ -30,8 +29,6 @@ class RedditDataset:
         else:
             dataset = preprocess(data_dir)
         self.dataset = dataset
-
-
 
 
 
@@ -154,7 +151,6 @@ def preprocess(data_dir):
 
 
 
-
 def _batch_data(data, batch_size=128, maxlen=400):
     '''
     data is a dict := {'x': [numpy array], 'y': [numpy array]} (on one client)
@@ -179,6 +175,7 @@ def _batch_data(data, batch_size=128, maxlen=400):
         batched_y = torch.tensor(batched_y, dtype=torch.long)
         batch_data.append((batched_x, batched_y))
     return batch_data#, maxlen_lst
+
 
 def _process_x(raw_x_batch, maxlen=400):
     CHAR_VOCAB = list('dhlptx@DHLPTX $(,048cgkoswCGKOSW[_#\'/37;?bfjnrvzBFJNRVZ"&*.26:\naeimquyAEIMQUY]!%)-159\r')
