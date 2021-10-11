@@ -36,10 +36,8 @@ class Trainer:
 
         for epoch in range(self.num_epoch):
             train_loss, correct, total = 0., 0, 0
+
             for input, labels in data:
-                print(input.size(), labels.size())
-            for input, labels in data:
-                print(input.size())
                 input, labels = input.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
                 output = model(input)

@@ -22,7 +22,6 @@ class CNN_DropOut(torch.nn.Module):
         #self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
-        x = torch.unsqueeze(x, 1)
         x = self.conv2d_1(x)
         x = self.relu(x)
         x = self.conv2d_2(x)

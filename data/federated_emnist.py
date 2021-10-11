@@ -18,7 +18,7 @@ class FederatedEMNISTDataset:
         print(f'Total number of users: {self.train_num_clients}')
 
     def _init_data(self, data_dir):
-        file_name = os.path.join(data_dir, 'FederatedEMNIST_preprocessed.pickle')
+        file_name = os.path.join(data_dir, 'FederatedEMNIST_preprocessed_.pickle')
         if os.path.isfile(file_name):
             with open(file_name, 'rb') as f:
                 dataset = pickle.load(f)
@@ -98,6 +98,8 @@ def _batch_data(data, batch_size=128):
     batch_data = list()
     for i in range(0, len(data_x), batch_size):
         batched_x = data_x[i:i + batch_size]
+        batched_x = np.expand_dims(batched_x, axis=1)
+        batched_x = torch.tensor(batched_x)
         batched_y = data_y[i:i + batch_size]
         batched_y = torch.tensor(batched_y, dtype=torch.long)
         batch_data.append((batched_x, batched_y))

@@ -24,7 +24,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu_id', type=str, default='0', help='gpu cuda index')
     parser.add_argument('--dataset', type=str, default='Reddit', help='dataset', choices=['Reddit','FederatedEMNIST'])
-    parser.add_argument('--data_dir', type=str, default='D:/data/Reddit/', help='dataset directory')
+    parser.add_argument('--data_dir', type=str, default='D:/data/FL/Reddit/', help='dataset directory')
     parser.add_argument('--model', type=str, default='BLSTM', help='model', choices=['BLSTM','CNN'])
     parser.add_argument('--method', type=str, default='Random', choices=['Random', 'AFL'], help='client selection')
     parser.add_argument('--fed_algo', type=str, default='FedAvg', choices=['FedAvg', 'FedAdam'],
@@ -67,11 +67,11 @@ def create_model(args):
 if __name__ == '__main__':
     # set up
     args = get_args()
-    '''wandb.init(
+    wandb.init(
         project=f'AFL-{args.dataset}',
-        name=f"{args.method}-{args.fed_algo}-{args.num_clients_per_round}/{args.total_num_client}",#-{args.comment}",
+        name=f"{args.method}-{args.fed_algo}-{args.num_clients_per_round}",#-{args.comment}",
         config=args
-    )'''
+    )
     args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(args.device)  # change allocation of current GPU
     print('Current cuda device: {}'.format(torch.cuda.current_device()))
