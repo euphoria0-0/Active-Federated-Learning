@@ -4,13 +4,23 @@ import torch
 import numpy as np
 
 
-class FedAvg:
-    def __init__(self, train_sizes):
+class FederatedAlgorithm:
+    def __init__(self, train_sizes, init_model):
         self.train_sizes = train_sizes
+        self.param_keys = init_model.keys()
+
+    def update(self, local_models, client_indices, global_model=None):
+        pass
+
+
+
+class FedAvg(FederatedAlgorithm):
+    def __init__(self, train_sizes, init_model):
+        super().__init__(train_sizes, init_model)
 
     def update(self, local_models, client_indices, global_model=None):
         update_model = OrderedDict() #deepcopy(local_models[0].cpu().state_dict())
-        for k in local_models[0].cpu().state_dict().keys():
+        for k in self.param_keys:
             for idx in range(len(local_models)):
                 local_model = deepcopy(local_models[idx])
                 num_local_data = self.train_sizes[client_indices[idx]]
@@ -22,15 +32,15 @@ class FedAvg:
         return update_model
 
 
-class FedAdam:
-    def __init__(self, train_sizes, args, init_model):
-        self.train_sizes = train_sizes
-        self.beta1 = args.beta1      # 0.9
-        self.beta2 = args.beta2      # 0.999
+class FedAdam(FederatedAlgorithm):
+    def __init__(self, train_sizes, init_model, args):
+        super().__init__(train_sizes, init_model)
+        self.beta1 = args.beta1  # 0.9
+        self.beta2 = args.beta2  # 0.999
         self.epsilon = args.epsilon  # 1e-8
         self.lr_global = args.lr_global
         self.m, self.v = OrderedDict(), OrderedDict()
-        for k in init_model.keys():
+        for k in self.param_keys:
             self.m[k], self.v[k] = 0., 0.
 
     def update(self, local_models, client_indices, global_model):

@@ -13,85 +13,50 @@ from FL_core.federated_algorithm import FedAvg, FedAdam
 
 
 class Server(object):
-    def __init__(self, data, model, args):
+    def __init__(self, data, init_model, args):
         self.train_data = data['train']['data']
         self.train_sizes = data['train']['data_sizes']
         self.test_data = data['test']['data']
         self.test_sizes = data['test']['data_sizes']
         self.test_clients = data['test']['data_sizes'].keys()
-        self.method = args.method
-        self.fed_algo = args.fed_algo
-        self.model = model
         self.device = args.device
         self.args = args
 
-        self.client_list = []
         self.total_num_client = args.total_num_client
         self.num_clients_per_round = args.num_clients_per_round
-        self.test_num_clients = args.test_num_clients if args.test_num_clients is not None else args.total_num_client
         self.total_round = args.num_round
 
-        if self.fed_algo == 'FedAdam':
-            self.m = OrderedDict()
-            self.v = OrderedDict()
-            for k in model.state_dict():
-                self.m[k], self.v[k] = 0., 0.
+        self.trainer = Trainer(init_model, args)
 
-        self.trainer = Trainer(model, args)
+        self._init_clients(init_model)
+        self._init_fed_algo(args.fed_algo)
+        self._client_selection(args.method)
 
-        self._init_clients()
-
-    def _init_clients(self):
+    def _init_clients(self, init_model):
+        self.client_list = []
         for client_idx in range(self.total_num_client):
             local_test_data = np.array([]) if client_idx not in self.test_clients else self.test_data[client_idx]
-            c = Client(client_idx, self.train_data[client_idx], local_test_data, self.model, self.args)
+            c = Client(client_idx, self.train_data[client_idx], local_test_data, init_model, self.args)
             self.client_list.append(c)
+
+    def _init_fed_algo(self, fed_algo='FedAvg'):
+        global_model = self.trainer.get_model_params()
+        if fed_algo == 'FedAdam':
+            federated_method = FedAdam(self.train_sizes, global_model, args=self.args)
+        else: # FedAvg
+            federated_method = FedAvg(self.train_sizes, global_model)
+        self.federated_method = federated_method
 
     def _client_selection(self, method='AFL'):
         if method == 'AFL':
-            selection_method = ActiveFederatedLearning
-        return selection_method
+            self.selection_method = ActiveFederatedLearning(self.total_num_client, self.device)
+        else:
+            self.selection_method = None
 
     def _aggregate_local_models(self, local_models, client_indices, global_model):
-        if self.fed_algo == 'FedAvg':
-            '''update_model = deepcopy(local_models[0].cpu().state_dict())
-            for k in update_model.keys():
-                for idx in range(len(local_models)):
-                    local_model = deepcopy(local_models[idx])
-                    num_local_data = self.train_sizes[client_indices[idx]]
-                    weight = num_local_data / sum(self.train_sizes)
-                    if idx == 0:
-                        update_model[k] = weight * local_model.cpu().state_dict()[k]
-                    else:
-                        update_model[k] += weight * local_model.cpu().state_dict()[k]'''
-            #update_model = FedAvg(local_models, client_indices, self.train_sizes)
-            federated_method = FedAvg(self.train_sizes)
-
-        elif self.fed_algo == 'FedAdam':
-            '''gradient_update = OrderedDict()
-            for k in global_model.keys():
-                for idx in range(len(local_models)):
-                    local_model = deepcopy(local_models[idx]).state_dict()
-                    num_local_data = self.train_sizes[client_indices[idx]]
-                    weight = num_local_data / sum(self.train_sizes)
-                    if idx == 0:
-                        gradient_update[k] = weight * local_model[k]
-                    else:
-                        gradient_update[k] -= weight * local_model[k]
-
-            update_model = OrderedDict()
-            for k in gradient_update.keys():
-                g = gradient_update[k]
-                self.m[k] = self.args.beta1 * self.m[k] + (1 - self.args.beta1) * g
-                self.v[k] = self.args.beta2 * self.v[k] + (1 - self.args.beta2) * torch.mul(g, g)
-                m_hat = self.m[k] / (1 - self.args.beta1)
-                v_hat = self.v[k] / (1 - self.args.beta2)
-                update_model[k] = global_model[k] - self.args.lr_global * m_hat / (np.sqrt(v_hat) + self.args.epsilon)'''
-            federated_method = FedAdam(self.train_sizes, self.args, global_model)
-
-        update_model = federated_method.update(local_models, client_indices, global_model)
-
+        update_model = self.federated_method.update(local_models, client_indices, global_model)
         return update_model
+
 
     def train(self):
         # get global model
@@ -99,7 +64,7 @@ class Server(object):
         for round_idx in range(self.total_round):
             print(f'>> round {round_idx}')
             # set clients
-            if self.method == 'Random':
+            if self.selection_method is None:
                 client_indices = torch.randint(self.total_num_client, (self.num_clients_per_round,)).tolist()
             else:
                 client_indices = [*range(self.total_num_client)]
@@ -119,17 +84,16 @@ class Server(object):
             })
 
             # client selection
-            if self.method != 'Random':
-                selection_method = self._client_selection()
-                selection_method = selection_method(local_models, local_losses,
-                                                    self.total_num_client, self.num_clients_per_round, self.device)
-                selected_client_indices = selection_method.select(round_idx)
+            if self.selection_method is not None:
+                selected_client_indices = self.selection_method.select(self.num_clients_per_round,
+                                                                       local_losses, round_idx)
                 local_models = [local_models[i] for i in selected_client_indices]
-                client_indices = np.array(client_indices)[selected_client_indices.astype(int)].tolist()
+                client_indices = np.array(client_indices)[selected_client_indices].tolist()
 
             # update global model
             global_model = self._aggregate_local_models(local_models, client_indices, global_model)
             self.trainer.set_model_params(global_model)
+
 
             # test
             self.test()

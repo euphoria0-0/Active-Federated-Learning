@@ -1,4 +1,4 @@
-from FL_core.trainer import Trainer
+from FL_core.client_trainer import ClientTrainer
 
 
 class Client(object):
@@ -7,11 +7,15 @@ class Client(object):
         self.local_train_data = local_train_data
         self.local_test_data = local_test_data
         self.device = args.device
-        self.trainer = Trainer(model, args)
+        self.trainer = ClientTrainer(model, args)
+        self.num_epoch = args.num_epoch # local epoch
 
     def train(self, global_model, tracking=True):
         self.trainer.set_model_params(global_model)
-        model, acc, loss = self.trainer.train(self.local_train_data, tracking)
+        if self.num_epoch == 0:
+            model, acc, loss = self.trainer.train_E0(self.local_train_data, tracking)
+        else:
+            model, acc, loss = self.trainer.train(self.local_train_data, tracking)
         return model.cpu(), acc, loss
 
     def test(self, mode='test'):

@@ -23,13 +23,13 @@ class FederatedEMNISTDataset:
             with open(file_name, 'rb') as f:
                 dataset = pickle.load(f)
         else:
-            dataset = preprocess(data_dir)
+            dataset = preprocess(data_dir, self.batch_size)
         self.dataset = dataset
 
 
 
 
-def preprocess(data_dir):
+def preprocess(data_dir, batch_size=128):
     train_data = h5py.File(os.path.join(data_dir, 'fed_emnist_train.h5'), 'r')
     test_data = h5py.File(os.path.join(data_dir, 'fed_emnist_test.h5'), 'r')
 
@@ -48,13 +48,13 @@ def preprocess(data_dir):
 
         train_x = train_data['examples'][client_id]['pixels'][()]
         train_y = train_data['examples'][client_id]['label'][()]
-        local_data = _batch_data({'pixels':train_x, 'label':train_y})
+        local_data = _batch_data({'pixels':train_x, 'label':train_y}, batch_size=batch_size)
         train_data_local_dict[client_idx] = local_data
         train_data_local_num_dict[client_idx] = len(train_x)
 
         test_x = test_data['examples'][client_id]['pixels'][()]
         test_y = test_data['examples'][client_id]['label'][()]
-        local_data = _batch_data({'pixels': test_x, 'label': test_y})
+        local_data = _batch_data({'pixels': test_x, 'label': test_y}, batch_size=batch_size)
         test_data_local_dict[client_idx] = local_data
         test_data_local_num_dict[client_idx] = len(test_x)
         if len(test_x) == 0:

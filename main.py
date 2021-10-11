@@ -34,9 +34,14 @@ def get_args():
     parser.add_argument('--lr_local', type=float, default=0.01, help='learning rate for optim')
     parser.add_argument('--lr_global', type=float, default=0.001, help='learning rate for optim')
     parser.add_argument('--wdecay', type=float, default=0, help='weight decay for optim')
+
     parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for Adam')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam')
     parser.add_argument('--epsilon', type=float, default=1e-8, help='epsilon for Adam')
+
+    parser.add_argument('--alpha1', type=float, default=0.75, help='beta1 for Adam')
+    parser.add_argument('--alpha2', type=float, default=0.01, help='beta2 for Adam')
+    parser.add_argument('--alpha3', type=float, default=0.1, help='epsilon for Adam')
 
     parser.add_argument('--num_epoch', type=int, default=2, help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size of each client data')
