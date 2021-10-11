@@ -9,6 +9,7 @@ from collections import OrderedDict
 from FL_core.client import Client
 from FL_core.trainer import Trainer
 from FL_core.client_selection import ActiveFederatedLearning
+from FL_core.federated_algorithm import FedAvg, FedAdam
 
 
 class Server(object):
@@ -53,7 +54,7 @@ class Server(object):
 
     def _aggregate_local_models(self, local_models, client_indices, global_model):
         if self.fed_algo == 'FedAvg':
-            update_model = deepcopy(local_models[0].cpu().state_dict())
+            '''update_model = deepcopy(local_models[0].cpu().state_dict())
             for k in update_model.keys():
                 for idx in range(len(local_models)):
                     local_model = deepcopy(local_models[idx])
@@ -62,10 +63,12 @@ class Server(object):
                     if idx == 0:
                         update_model[k] = weight * local_model.cpu().state_dict()[k]
                     else:
-                        update_model[k] += weight * local_model.cpu().state_dict()[k]
+                        update_model[k] += weight * local_model.cpu().state_dict()[k]'''
+            #update_model = FedAvg(local_models, client_indices, self.train_sizes)
+            federated_method = FedAvg(self.train_sizes)
 
         elif self.fed_algo == 'FedAdam':
-            gradient_update = OrderedDict()
+            '''gradient_update = OrderedDict()
             for k in global_model.keys():
                 for idx in range(len(local_models)):
                     local_model = deepcopy(local_models[idx]).state_dict()
@@ -83,7 +86,10 @@ class Server(object):
                 self.v[k] = self.args.beta2 * self.v[k] + (1 - self.args.beta2) * torch.mul(g, g)
                 m_hat = self.m[k] / (1 - self.args.beta1)
                 v_hat = self.v[k] / (1 - self.args.beta2)
-                update_model[k] = global_model[k] - self.args.lr_global * m_hat / (np.sqrt(v_hat) + self.args.epsilon)
+                update_model[k] = global_model[k] - self.args.lr_global * m_hat / (np.sqrt(v_hat) + self.args.epsilon)'''
+            federated_method = FedAdam(self.train_sizes, self.args, global_model)
+
+        update_model = federated_method.update(local_models, client_indices, global_model)
 
         return update_model
 
