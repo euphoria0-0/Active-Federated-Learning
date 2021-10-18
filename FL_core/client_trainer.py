@@ -31,7 +31,9 @@ class ClientTrainer:
         criterion = nn.CrossEntropyLoss().to(self.device)
 
         if self.client_optimizer == 'sgd':
-            optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
+            #optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
+            optimizer = optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters()),
+                                  lr=self.lr)
         else:
             optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
 
@@ -46,22 +48,25 @@ class ClientTrainer:
                 loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
-                train_loss += torch.sum(loss)
+                train_loss += loss.item()
                 correct += torch.sum(preds == labels.data)
                 total += input.size(0)
 
                 loss.backward()
                 optimizer.step()
 
+                torch.cuda.empty_cache()
+
             train_acc = correct / total
-            train_loss = train_loss / np.sqrt(total)
+            train_loss = train_loss / total
             sys.stdout.write('\rEpoch {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(epoch+1, self.num_epoch,
                                                                                      train_loss, train_acc))
+
         if tracking:
             print()
         self.model = model
 
-        return model, train_acc, train_loss.cpu().detach()
+        return model, train_acc, train_loss
 
     def train_E0(self, data, tracking=True):
         model = self.model
@@ -89,6 +94,8 @@ class ClientTrainer:
             total += input.size(0)
             correct += torch.sum(preds == labels.data)
 
+            torch.cuda.empty_cache()
+
         train_acc = correct / total
         avg_loss = sum(batch_loss) / total
 
@@ -103,8 +110,8 @@ class ClientTrainer:
 
         return model, train_acc, avg_loss.cpu().detach()
 
-    def test(self, data):
-        model = self.model.to(self.device)
+    def test(self, model, data):
+        model = model.to(self.device)
         model.eval()
 
         criterion = nn.CrossEntropyLoss().to(self.device)
@@ -125,6 +132,8 @@ class ClientTrainer:
 
                 y_true = np.append(y_true, labels.cpu().numpy(), axis=0)
                 y_score = np.append(y_score, preds.cpu().numpy(), axis=0)
+
+                torch.cuda.empty_cache()
 
         try:
             auc = roc_auc_score(y_true, y_score)

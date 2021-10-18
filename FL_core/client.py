@@ -18,9 +18,12 @@ class Client(object):
             model, acc, loss = self.trainer.train(self.local_train_data, tracking)
         return model.cpu(), acc, loss
 
-    def test(self, mode='test'):
+    def test(self, model, mode='test'):
         if mode == 'train':
-            acc, loss, auc = self.trainer.test(self.local_train_data)
+            acc, loss, auc = self.trainer.test(model, self.local_train_data)
         else:
-            acc, loss, auc = self.trainer.test(self.local_test_data)
+            acc, loss, auc = self.trainer.test(model, self.local_test_data)
         return {'loss': loss, 'acc': acc, 'auc': auc}
+
+    def get_client_idx(self):
+        return self.client_idx

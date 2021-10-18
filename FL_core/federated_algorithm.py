@@ -7,7 +7,10 @@ import numpy as np
 class FederatedAlgorithm:
     def __init__(self, train_sizes, init_model):
         self.train_sizes = train_sizes
-        self.param_keys = init_model.keys()
+        if type(init_model) == OrderedDict:
+            self.param_keys = init_model.keys()
+        else:
+            self.param_keys = init_model.cpu().state_dict().keys()
 
     def update(self, local_models, client_indices, global_model=None):
         pass

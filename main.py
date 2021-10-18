@@ -14,9 +14,9 @@ import torch
 
 from data import reddit, federated_emnist
 from model import BLSTM, CNN
-from FL_core.trainer import Trainer
 from FL_core.server import Server
-
+from FL_core.client_selection import ActiveFederatedLearning
+from FL_core.federated_algorithm import FedAvg, FedAdam
 
 
 
@@ -50,7 +50,7 @@ def get_args():
 
     parser.add_argument('--maxlen', type=int, default=400, help='maxlen for NLP dataset')
 
-    #parser.add_argument('--comment', type=str, default='', help='comment')
+    parser.add_argument('--comment', type=str, default='', help='comment')
     args = parser.parse_args()
     return args
 
@@ -67,6 +67,22 @@ def create_model(args):
         return BLSTM.BLSTM(vocab_size=args.maxlen, num_classes=args.num_classes)
     elif args.model == 'CNN':
         return CNN.CNN_DropOut(False)
+
+
+def client_selection_method(args):
+    if args.method == 'AFL':
+        return ActiveFederatedLearning(args.total_num_client, args.device)
+    else:
+        return None
+
+
+def federated_algorithm(dataset, model, args):
+    train_sizes = dataset['train']['data_sizes']
+    if args.fed_algo == 'FedAdam':
+        return FedAdam(train_sizes, model, args=args)
+    else:  # FedAvg
+        return FedAvg(train_sizes, model)
+
 
 
 if __name__ == '__main__':
@@ -90,10 +106,11 @@ if __name__ == '__main__':
 
     # set model
     model = create_model(args)
-    trainer = Trainer(model, args)
+    client_selection = client_selection_method(args)
+    fed_algo = federated_algorithm(dataset, model, args)
 
     # set federated optim algorithm
-    FedAPI = Server(dataset, model, args)
+    ServerExecute = Server(dataset, model, args, client_selection, fed_algo)
 
     # train
-    FedAPI.train()
+    ServerExecute.train()
