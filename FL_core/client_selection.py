@@ -20,7 +20,7 @@ class ActiveFederatedLearning(ClientSelection):
 
     def select(self, n, metric, seed=0):
         # set sampling distribution
-        probs = np.array([np.exp(self.alpha2 * v.item()) for v in metric])
+        probs = np.array([np.exp(self.alpha2 * v) for v in metric])
         # 1) select 75% of K(total) users
         num_select = int(self.alpha1 * self.total)
         argsorted_value_list = np.argsort(metric)

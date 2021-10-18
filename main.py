@@ -71,7 +71,7 @@ def create_model(args):
 
 def client_selection_method(args):
     if args.method == 'AFL':
-        return ActiveFederatedLearning(args.total_num_client, args.device)
+        return ActiveFederatedLearning(args.total_num_client, args.device, args)
     else:
         return None
 
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     args = get_args()
     wandb.init(
         project=f'AFL-{args.dataset}',
-        name=f"{args.method}-{args.fed_algo}-{args.num_clients_per_round}",#-{args.comment}",
+        name=f"{args.method}-{args.fed_algo}-{args.num_clients_per_round}{args.comment}",
         config=args
     )
     args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")

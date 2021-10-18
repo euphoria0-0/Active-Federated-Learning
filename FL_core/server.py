@@ -59,6 +59,10 @@ class Server(object):
                 local_losses.append(local_loss)
                 accuracy += local_acc
 
+                sys.stdout.write(
+                    '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
+                                                                             local_loss, local_acc))
+
                 torch.cuda.empty_cache()
 
             wandb.log({
