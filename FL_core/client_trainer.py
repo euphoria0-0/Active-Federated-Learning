@@ -64,9 +64,9 @@ class ClientTrainer:
 
         if tracking:
             print()
-        self.model = model
+        #self.model = model
 
-        return model, train_acc, train_loss
+        return train_acc, train_loss
 
     def train_E0(self, data, tracking=True):
         model = self.model

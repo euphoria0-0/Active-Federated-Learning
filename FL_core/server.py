@@ -52,7 +52,6 @@ class Server(object):
             # set clients
             client_indices = [*range(self.total_num_client)]
             if self.selection_method is None:
-                #client_indices = torch.randint(self.total_num_client, (self.num_clients_per_round,)).tolist()
                 client_indices = np.random.choice(client_indices, size=self.num_clients_per_round, replace=False)
             print(f'Selected clients: {sorted(client_indices)[:10]}')
 
@@ -60,10 +59,11 @@ class Server(object):
             local_models, local_losses, accuracy = [], [], 0
             for client_idx in tqdm(client_indices, desc='>> Local training', leave=True):
                 client = self.client_list[client_idx]
-                local_model, local_acc, local_loss = client.train(global_model, tracking=False)
+                local_model, local_acc, local_loss = client.train(deepcopy(global_model), tracking=False)
                 local_models.append(deepcopy(local_model))
                 local_losses.append(local_loss)
                 accuracy += local_acc
+                torch.cuda.empty_cache()
 
             wandb.log({
                 'Train/Loss': sum(local_losses) / len(client_indices),

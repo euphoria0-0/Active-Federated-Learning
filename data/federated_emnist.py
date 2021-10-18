@@ -48,6 +48,7 @@ def preprocess(data_dir, batch_size=128):
 
         train_x = train_data['examples'][client_id]['pixels'][()]
         train_y = train_data['examples'][client_id]['label'][()]
+
         local_data = _batch_data({'pixels':train_x, 'label':train_y}, batch_size=batch_size)
         train_data_local_dict[client_idx] = local_data
         train_data_local_num_dict[client_idx] = len(train_x)
