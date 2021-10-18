@@ -39,14 +39,9 @@ class Server(object):
             c = Client(client_idx, self.train_data[client_idx], local_test_data, init_model, self.args)
             self.client_list.append(c)
 
-    def _aggregate_local_models(self, local_models, client_indices, global_model):
-        update_model = self.federated_method.update(local_models, client_indices, global_model)
-        return update_model
-
-
     def train(self):
         # get global model
-        global_model = self.trainer.get_model_params()
+        self.global_model = self.trainer.get_model()
         for round_idx in range(self.total_round):
             print(f'>> round {round_idx}')
             # set clients
@@ -59,10 +54,11 @@ class Server(object):
             local_models, local_losses, accuracy = [], [], 0
             for client_idx in tqdm(client_indices, desc='>> Local training', leave=True):
                 client = self.client_list[client_idx]
-                local_model, local_acc, local_loss = client.train(deepcopy(global_model), tracking=False)
+                local_model, local_acc, local_loss = client.train(self.global_model, tracking=False)
                 local_models.append(deepcopy(local_model))
                 local_losses.append(local_loss)
                 accuracy += local_acc
+
                 torch.cuda.empty_cache()
 
             wandb.log({
@@ -79,37 +75,37 @@ class Server(object):
                 local_models = [local_models[i] for i in selected_client_indices]
                 client_indices = np.array(client_indices)[selected_client_indices].tolist()
 
-            # update global model
-            global_model = self._aggregate_local_models(local_models, client_indices, global_model)
-            self.trainer.set_model_params(global_model)
+            # aggregate local models and update global model
+            global_model_params = self.federated_method.update(local_models, client_indices, self.global_model)
+            self.global_model.load_state_dict(global_model_params)
+            self.trainer.set_model(self.global_model)
 
             # test
-            self.global_model.load_state_dict(global_model)
             self.test()
 
             torch.cuda.empty_cache()
 
 
-    def test(self):
-        '''metrics = {'loss': [], 'acc': [], 'auc': []}
-        for client_idx in tqdm(range(self.total_num_client), desc='>> Local test for train', leave=True):
-            client = self.client_list[client_idx]
-            result = client.test(self.global_model, 'train')
-            metrics['loss'].append(result['loss'])
-            metrics['acc'].append(result['acc'])
-            metrics['auc'].append(result['auc'])
-            sys.stdout.write(
-                '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(client_idx, self.total_num_client,
-                                                                         result['loss'], result['acc']))
+    def test(self, test_on_training_data=False):
+        if test_on_training_data:
+            metrics = {'loss': [], 'acc': []}
+            for client_idx in tqdm(range(self.total_num_client), desc='>> Local test for train', leave=True):
+                client = self.client_list[client_idx]
+                result = client.test(self.global_model, 'train')
+                metrics['loss'].append(result['loss'])
+                metrics['acc'].append(result['acc'])
+                sys.stdout.write(
+                    '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(client_idx, self.total_num_client,
+                                                                             result['loss'], result['acc']))
 
-        wandb.log({
-            'Train/Loss': sum(metrics['loss']) / self.total_num_client,
-            'Train/Acc': sum(metrics['acc']) / self.total_num_client
-        })
-        print('ALL Clients TrainLoss {:.6f} TrainAcc {:.4f}'.format(sum(metrics['loss']) / self.total_num_client,
-                                                                    sum(metrics['acc']) / self.total_num_client))
+            wandb.log({
+                'Train/Loss': sum(metrics['loss']) / self.total_num_client,
+                'Train/Acc': sum(metrics['acc']) / self.total_num_client
+            })
+            print('ALL Clients TrainLoss {:.6f} TrainAcc {:.4f}'.format(sum(metrics['loss']) / self.total_num_client,
+                                                                        sum(metrics['acc']) / self.total_num_client))
 
-        '''
+
         num_test_clients = len(self.test_clients)
 
         metrics = {'loss': [], 'acc': [], 'auc': []}

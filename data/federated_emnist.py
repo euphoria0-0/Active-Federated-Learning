@@ -37,7 +37,7 @@ def preprocess(data_dir, batch_size=128):
     test_ids = list(test_data['examples'].keys())
     num_clients_train = len(train_ids)
     num_clients_test = len(test_ids)
-    print(num_clients_train, num_clients_test)
+    print(f'num_clients_train {num_clients_train} num_clients_test {num_clients_test}')
 
     # local dataset
     train_data_local_dict, train_data_local_num_dict = {}, {}

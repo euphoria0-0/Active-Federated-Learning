@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 
 
-class ClientTrainer:
+class Trainer:
     def __init__(self, model, args):
         self.model = model
         self.device = args.device

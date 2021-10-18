@@ -24,17 +24,15 @@ class FedAvg(FederatedAlgorithm):
     def update(self, local_models, client_indices, global_model=None):
         num_training_data = sum([self.train_sizes[idx] for idx in client_indices])
         update_model = OrderedDict()
-        for k in self.param_keys:
-            for idx in range(len(client_indices)):
-                local_model = deepcopy(local_models[idx])
-                num_local_data = self.train_sizes[client_indices[idx]]
-                weight = num_local_data / num_training_data
+        for idx in range(len(client_indices)):
+            local_model = local_models[idx].cpu().state_dict()
+            num_local_data = self.train_sizes[client_indices[idx]]
+            weight = num_local_data / num_training_data
+            for k in self.param_keys:
                 if idx == 0:
                     update_model[k] = weight * local_model[k]
                 else:
                     update_model[k] += weight * local_model[k]
-                torch.cuda.empty_cache()
-
         return update_model
 
 
@@ -50,17 +48,20 @@ class FedAdam(FederatedAlgorithm):
             self.m[k], self.v[k] = 0., 0.
 
     def update(self, local_models, client_indices, global_model):
+        num_training_data = sum([self.train_sizes[idx] for idx in client_indices])
         gradient_update = OrderedDict()
-        for k in self.param_keys:
-            for idx in range(len(local_models)):
-                local_model = deepcopy(local_models[idx])#.state_dict()
-                num_local_data = self.train_sizes[client_indices[idx]]
-                weight = num_local_data / sum(self.train_sizes.values())
+        for idx in range(len(local_models)):
+            local_model = local_models[idx].cpu().state_dict()
+            num_local_data = self.train_sizes[client_indices[idx]]
+            weight = num_local_data / num_training_data
+            for k in self.param_keys:
                 if idx == 0:
                     gradient_update[k] = weight * local_model[k]
                 else:
-                    gradient_update[k] -= weight * local_model[k]
+                    gradient_update[k] += weight * local_model[k]
+                torch.cuda.empty_cache()
 
+        global_model = global_model.cpu().state_dict()
         update_model = OrderedDict()
         for k in self.param_keys:
             g = gradient_update[k]
