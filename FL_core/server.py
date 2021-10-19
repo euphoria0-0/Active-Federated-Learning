@@ -48,7 +48,7 @@ class Server(object):
             client_indices = [*range(self.total_num_client)]
             if self.selection_method is None:
                 client_indices = np.random.choice(client_indices, size=self.num_clients_per_round, replace=False)
-            print(f'Selected clients: {sorted(client_indices)[:10]}')
+                print(f'Selected clients: {sorted(client_indices)[:10]}')
 
             # local training
             local_models, local_losses, accuracy = [], [], 0
@@ -56,7 +56,7 @@ class Server(object):
                 client = self.client_list[client_idx]
                 local_model, local_acc, local_loss = client.train(self.global_model, tracking=False)
                 local_models.append(deepcopy(local_model))
-                local_losses.append(local_loss)
+                local_losses.append(local_loss / client.local_train_data)
                 accuracy += local_acc
 
                 sys.stdout.write(

@@ -20,7 +20,7 @@ class ActiveFederatedLearning(ClientSelection):
 
     def select(self, n, metric, seed=0):
         # set sampling distribution
-        probs = np.array([np.exp(self.alpha2 * v) for v in metric])
+        probs = modified_exp(np.array(metric)) * np.exp(self.alpha2)
         # 1) select 75% of K(total) users
         num_select = int(self.alpha1 * self.total)
         argsorted_value_list = np.argsort(metric)
@@ -34,5 +34,15 @@ class ActiveFederatedLearning(ClientSelection):
         not_selected = np.array(list(set(np.arange(self.total)) - set(selected)))
         selected2 = np.random.choice(not_selected, n - num_select, replace=False)
         selected_client_idxs = np.append(selected, selected2, axis=0)
-        print(f'selected users: {selected_client_idxs.shape}')
+        print(f'{len(selected_client_idxs)} selected users: {selected_client_idxs}')
         return selected_client_idxs.astype(int)
+
+
+def modified_exp(x, SAFETY=2.0):
+    mrn = np.finfo(x.dtype).max
+    threshold = np.log(mrn / x.size) - SAFETY
+    xmax = x.max()
+    if xmax > threshold:
+        return np.exp(x - (xmax - threshold))
+    else:
+        return np.exp(x)
