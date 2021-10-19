@@ -12,6 +12,7 @@ from FL_core.trainer import Trainer
 
 class Server(object):
     def __init__(self, data, init_model, args, selection, fed_algo):
+        print('init')
         self.train_data = data['train']['data']
         self.train_sizes = data['train']['data_sizes']
         self.test_data = data['test']['data']

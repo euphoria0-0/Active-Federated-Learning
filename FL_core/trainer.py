@@ -42,7 +42,6 @@ class Trainer:
                 input, labels = input.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
                 output = model(input)
-                #loss = criterion(output, labels.unsqueeze(1).type_as(output))
                 loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
@@ -71,7 +70,7 @@ class Trainer:
         model = model.to(self.device)
         model.eval()
 
-        criterion = nn.CrossEntropyLoss(reduction='sum').to(self.device)
+        criterion = nn.CrossEntropyLoss().to(self.device)
 
         if self.client_optimizer == 'sgd':
             optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
@@ -84,7 +83,6 @@ class Trainer:
             input, labels = input.to(self.device), labels.to(self.device)
             optimizer.zero_grad()
             output = model(input)
-            #loss = criterion(output, labels.unsqueeze(1).type_as(output))
             loss = criterion(output, labels.long())
             _, preds = torch.max(output.data, 1)
 
@@ -106,7 +104,7 @@ class Trainer:
             print()
         self.model = model
 
-        return model, train_acc, avg_loss.cpu().detach()
+        return train_acc, avg_loss.cpu().detach()
 
     def test(self, model, data):
         model = model.to(self.device)
@@ -120,7 +118,6 @@ class Trainer:
             for input, labels in data:
                 input, labels = input.to(self.device), labels.to(self.device)
                 output = model(input)
-                #loss = criterion(output, labels.unsqueeze(1).type_as(output))
                 loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
