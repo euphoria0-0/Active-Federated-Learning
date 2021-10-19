@@ -56,7 +56,7 @@ class Server(object):
                 client = self.client_list[client_idx]
                 local_model, local_acc, local_loss = client.train(self.global_model, tracking=False)
                 local_models.append(deepcopy(local_model))
-                local_losses.append(local_loss / client.local_train_data)
+                local_losses.append(local_loss / self.train_sizes[client_idx])
                 accuracy += local_acc
 
                 sys.stdout.write(
