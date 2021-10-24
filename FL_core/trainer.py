@@ -45,8 +45,8 @@ class Trainer:
                 loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
-                train_loss += loss.item()
-                correct += torch.sum(preds == labels.data)
+                train_loss += loss.item() * input.size(0)
+                correct += torch.sum(preds == labels.data).cpu().data.numpy()
                 total += input.size(0)
 
                 loss.backward()
@@ -86,9 +86,9 @@ class Trainer:
             loss = criterion(output, labels.long())
             _, preds = torch.max(output.data, 1)
 
-            batch_loss.append(loss) ##### loss sum
-            total += input.size(0)
-            correct += torch.sum(preds == labels.data)
+            batch_loss.append(loss * input.size(0)) ##### loss sum
+            total += input.size(0).cpu().data.numpy()
+            correct += torch.sum(preds == labels.data).cpu().data.numpy()
 
             torch.cuda.empty_cache()
 
@@ -121,7 +121,7 @@ class Trainer:
                 loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
-                test_loss += loss.item()
+                test_loss += loss.item() * input.size(0)
                 correct += preds.eq(labels).sum()
                 total += input.size(0)
 

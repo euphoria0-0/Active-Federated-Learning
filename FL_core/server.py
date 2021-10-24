@@ -12,7 +12,6 @@ from FL_core.trainer import Trainer
 
 class Server(object):
     def __init__(self, data, init_model, args, selection, fed_algo):
-        print('init')
         self.train_data = data['train']['data']
         self.train_sizes = data['train']['data_sizes']
         self.test_data = data['test']['data']
@@ -52,13 +51,13 @@ class Server(object):
                 print(f'Selected clients: {sorted(client_indices)[:10]}')
 
             # local training
-            local_models, local_losses, accuracy = [], [], 0
+            local_models, local_losses, accuracy = [], [], []
             for client_idx in tqdm(client_indices, desc='>> Local training', leave=True):
                 client = self.client_list[client_idx]
-                local_model, local_acc, local_loss = client.train(self.global_model, tracking=False)
+                local_model, local_acc, local_loss = client.train(deepcopy(self.global_model), tracking=False)
                 local_models.append(deepcopy(local_model))
                 local_losses.append(local_loss / self.train_sizes[client_idx])
-                accuracy += local_acc
+                accuracy.append(local_acc)
 
                 sys.stdout.write(
                     '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
@@ -66,19 +65,22 @@ class Server(object):
 
                 torch.cuda.empty_cache()
 
-            wandb.log({
-                'Train/Loss': sum(local_losses) / len(client_indices),
-                'Train/Acc': accuracy / len(client_indices)
-            })
-            print('{} Clients TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(client_indices),
-                                                                       sum(local_losses) / len(client_indices),
-                                                                       accuracy / len(client_indices)))
             # client selection
             if self.selection_method is not None:
                 selected_client_indices = self.selection_method.select(self.num_clients_per_round,
                                                                        local_losses, round_idx)
                 local_models = [local_models[i] for i in selected_client_indices]
                 client_indices = np.array(client_indices)[selected_client_indices].tolist()
+                local_losses = np.array(local_losses)[client_indices]
+                accuracy = np.array(accuracy)[client_indices]
+
+            wandb.log({
+                'Train/Loss': sum(local_losses) / len(client_indices),
+                'Train/Acc': sum(accuracy) / len(client_indices)
+            })
+            print('{} Clients TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(client_indices),
+                                                                       sum(local_losses) / len(client_indices),
+                                                                       sum(accuracy) / len(client_indices)))
 
             # aggregate local models and update global model
             global_model_params = self.federated_method.update(local_models, client_indices, self.global_model)
