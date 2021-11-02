@@ -45,14 +45,18 @@ def get_args():
     parser.add_argument('--alpha2', type=float, default=0.01, help='alpha2 for AFL')
     parser.add_argument('--alpha3', type=float, default=0.1, help='alpha3 for AFL')
 
-    parser.add_argument('--num_epoch', type=int, default=2, help='number of epochs')
-    parser.add_argument('--batch_size', type=int, default=128, help='batch size of each client data')
-    parser.add_argument('--num_round', type=int, default=20, help='total number of rounds')
-    parser.add_argument('--num_clients_per_round', type=int, default=200, help='number of participated clients')
+    parser.add_argument('-E','--num_epoch', type=int, default=2, help='number of epochs')
+    parser.add_argument('-B','--batch_size', type=int, default=128, help='batch size of each client data')
+    parser.add_argument('-R','--num_round', type=int, default=20, help='total number of rounds')
+    parser.add_argument('-A','--num_clients_per_round', type=int, default=200, help='number of participated clients')
 
     parser.add_argument('--maxlen', type=int, default=400, help='maxlen for NLP dataset')
 
     parser.add_argument('--comment', type=str, default='', help='comment')
+
+    parser.add_argument('--fix_seed', action='store_true', default=False, help='fix random seed')
+    parser.add_argument('--use_mp', action='store_true', default=False, help='use multiprocessing')
+
     args = parser.parse_args()
     return args
 
