@@ -20,22 +20,18 @@ class ActiveFederatedLearning(ClientSelection):
 
     def select(self, n, metric, seed=0):
         # set sampling distribution
-        probs = np.array(metric)
-        #probs = np.array(metric) * np.exp(self.alpha2)
-        #probs /= sum(probs)
-        #probs = np.nan_to_num(probs, nan=max(probs))
+        probs = np.array(metric) * np.exp(self.alpha2)
         # 1) select 75% of K(total) users
         num_select = int(self.alpha1 * self.total)
         argsorted_value_list = np.argsort(metric)
-        client_idxs = argsorted_value_list[-num_select:]
-        probs[client_idxs] = 0
-        probs *= np.exp(self.alpha2)
+        drop_client_idxs = argsorted_value_list[:self.total - num_select]
+        probs[drop_client_idxs] = 0
         probs /= sum(probs)
-        probs = np.nan_to_num(probs, nan=max(probs))
+        #probs = np.nan_to_num(probs, nan=max(probs))
         # 2) select 99% of m users using prob.
         num_select = int((1 - self.alpha3) * n)
         np.random.seed(seed)
-        selected = np.random.choice(self.total, num_select, p=probs/sum(probs), replace=False)
+        selected = np.random.choice(self.total, num_select, p=probs, replace=False)
         # 3) select 1% of m users randomly
         not_selected = np.array(list(set(np.arange(self.total)) - set(selected)))
         selected2 = np.random.choice(not_selected, n - num_select, replace=False)

@@ -13,6 +13,7 @@ class Trainer:
         self.client_optimizer = args.client_optimizer
         self.lr = args.lr_local
         self.wdecay = args.wdecay
+        self.momentum = args.momentum
         self.num_epoch = args.num_epoch   # num of local epoch E
         self.batch_size = args.batch_size # local batch size B
 
@@ -31,7 +32,7 @@ class Trainer:
         criterion = nn.CrossEntropyLoss().to(self.device)
 
         if self.client_optimizer == 'sgd':
-            optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
+            optimizer = optim.SGD(model.parameters(), lr=self.lr, momentum=self.momentum, weight_decay=self.wdecay)
         else:
             optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.wdecay)
 
@@ -45,8 +46,8 @@ class Trainer:
                 loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
-                train_loss += loss.item() * input.size(0)
-                correct += torch.sum(preds == labels.data).cpu().data.numpy()
+                train_loss += loss.detach().cpu().item() * input.size(0)
+                correct += torch.sum(preds == labels.data).detach().cpu().data.numpy()
                 total += input.size(0)
 
                 loss.backward()
@@ -87,8 +88,8 @@ class Trainer:
             _, preds = torch.max(output.data, 1)
 
             batch_loss.append(loss * input.size(0)) ##### loss sum
-            total += input.size(0).cpu().data.numpy()
-            correct += torch.sum(preds == labels.data).cpu().data.numpy()
+            total += input.size(0).detach().cpu().data.numpy()
+            correct += torch.sum(preds == labels.data).detach().cpu().data.numpy()
 
             torch.cuda.empty_cache()
 
@@ -104,7 +105,7 @@ class Trainer:
             print()
         self.model = model
 
-        return train_acc, avg_loss.cpu().detach()
+        return train_acc, avg_loss.detach().cpu()
 
     def test(self, model, data):
         model = model.to(self.device)
@@ -121,12 +122,12 @@ class Trainer:
                 loss = criterion(output, labels.long())
                 _, preds = torch.max(output.data, 1)
 
-                test_loss += loss.item() * input.size(0)
-                correct += preds.eq(labels).sum()
+                test_loss += loss.detach().cpu().item() * input.size(0)
+                correct += torch.sum(preds == labels.data).detach().cpu().data.numpy() #preds.eq(labels).sum()
                 total += input.size(0)
 
-                y_true = np.append(y_true, labels.cpu().numpy(), axis=0)
-                y_score = np.append(y_score, preds.cpu().numpy(), axis=0)
+                y_true = np.append(y_true, labels.detach().cpu().numpy(), axis=0)
+                y_score = np.append(y_score, preds.detach().cpu().numpy(), axis=0)
 
                 torch.cuda.empty_cache()
 

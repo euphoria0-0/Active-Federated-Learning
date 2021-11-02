@@ -36,7 +36,7 @@ class Server(object):
         self.client_list = []
         for client_idx in range(self.total_num_client):
             local_test_data = np.array([]) if client_idx not in self.test_clients else self.test_data[client_idx]
-            c = Client(client_idx, self.train_data[client_idx], local_test_data, init_model, self.args)
+            c = Client(client_idx, self.train_data[client_idx], local_test_data, deepcopy(init_model), self.args)
             self.client_list.append(c)
 
     def train(self):
@@ -55,7 +55,7 @@ class Server(object):
             for client_idx in tqdm(client_indices, desc='>> Local training', leave=True):
                 client = self.client_list[client_idx]
                 local_model, local_acc, local_loss = client.train(deepcopy(self.global_model), tracking=False)
-                local_models.append(deepcopy(local_model))
+                local_models.append(deepcopy(local_model.cpu()))
                 local_losses.append(local_loss / self.train_sizes[client_idx])
                 accuracy.append(local_acc)
 
@@ -69,11 +69,13 @@ class Server(object):
             if self.selection_method is not None:
                 selected_client_indices = self.selection_method.select(self.num_clients_per_round,
                                                                        local_losses, round_idx)
-                local_models = [local_models[i] for i in selected_client_indices]
-                client_indices = np.array(client_indices)[selected_client_indices].tolist()
-                local_losses = np.array(local_losses)[client_indices]
-                accuracy = np.array(accuracy)[client_indices]
+                local_models = np.take(local_models, selected_client_indices).tolist() #[local_models[i] for i in selected_client_indices]
+                client_indices = np.take(client_indices, selected_client_indices).tolist() #np.array(client_indices)[selected_client_indices].tolist()
+                local_losses = np.take(local_losses, selected_client_indices)
+                accuracy = np.take(accuracy, selected_client_indices)
+                torch.cuda.empty_cache()
 
+            print(len(selected_client_indices), len(client_indices))
             wandb.log({
                 'Train/Loss': sum(local_losses) / len(client_indices),
                 'Train/Acc': sum(accuracy) / len(client_indices)
