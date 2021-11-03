@@ -4,6 +4,7 @@ from copy import deepcopy
 from tqdm import tqdm
 import numpy as np
 import sys
+import multiprocessing as mp
 
 from FL_core.client import Client
 from FL_core.trainer import Trainer
@@ -23,6 +24,8 @@ class Server(object):
         self.selection_method = selection
         self.federated_method = fed_algo
 
+        self.nCPU = mp.cpu_count() // 2 if args.nCPU is None else args.nCPU
+
         self.total_num_client = args.total_num_client
         self.num_clients_per_round = args.num_clients_per_round
         self.total_round = args.num_round
@@ -40,10 +43,10 @@ class Server(object):
             self.client_list.append(c)
 
     def train(self):
-        # get global model
-        self.global_model = self.trainer.get_model()
         for round_idx in range(self.total_round):
             print(f'>> round {round_idx}')
+            # get global model
+            self.global_model = self.trainer.get_model()
             # set clients
             client_indices = [*range(self.total_num_client)]
             if self.selection_method is None:
@@ -52,30 +55,41 @@ class Server(object):
 
             # local training
             local_models, local_losses, accuracy = [], [], []
-            for client_idx in tqdm(client_indices, desc='>> Local training', leave=True):
-                client = self.client_list[client_idx]
-                local_model, local_acc, local_loss = client.train(deepcopy(self.global_model), tracking=False)
-                local_models.append(deepcopy(local_model.cpu()))
-                local_losses.append(local_loss / self.train_sizes[client_idx])
-                accuracy.append(local_acc)
-
-                sys.stdout.write(
-                    '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
-                                                                             local_loss, local_acc))
-
-                torch.cuda.empty_cache()
+            if self.args.use_mp:
+                iter = 0
+                with mp.pool.ThreadPool(processes=self.nCPU) as pool:
+                    iter += 1
+                    result = pool.map(self.local_training, client_indices)
+                    result = np.array(result)
+                    local_model, local_loss, local_acc = result[:,0], result[:,1], result[:,2]
+                    local_models.extend(local_model.tolist())
+                    local_losses.extend(local_loss.tolist())
+                    accuracy.extend(local_acc.tolist())
+                    sys.stdout.write(
+                        '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
+                                                                                 local_loss.mean().item(),
+                                                                                 local_acc.mean().item()))
+            else:
+                for client_idx in tqdm(client_indices, desc='>> Local training', leave=True):
+                    local_model, local_loss, local_acc = self.local_training(client_idx)
+                    local_models.append(local_model)
+                    local_losses.append(local_loss)
+                    accuracy.append(local_acc)
+                    sys.stdout.write(
+                        '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
+                                                                                 local_loss, local_acc))
 
             # client selection
             if self.selection_method is not None:
                 selected_client_indices = self.selection_method.select(self.num_clients_per_round,
                                                                        local_losses, round_idx)
-                local_models = np.take(local_models, selected_client_indices).tolist() #[local_models[i] for i in selected_client_indices]
-                client_indices = np.take(client_indices, selected_client_indices).tolist() #np.array(client_indices)[selected_client_indices].tolist()
+                local_models = np.take(local_models, selected_client_indices).tolist()
+                client_indices = np.take(client_indices, selected_client_indices).tolist()
                 local_losses = np.take(local_losses, selected_client_indices)
                 accuracy = np.take(accuracy, selected_client_indices)
                 torch.cuda.empty_cache()
 
-            print(len(selected_client_indices), len(client_indices))
+                print(len(selected_client_indices), len(client_indices))
             wandb.log({
                 'Train/Loss': sum(local_losses) / len(client_indices),
                 'Train/Acc': sum(accuracy) / len(client_indices)
@@ -94,44 +108,56 @@ class Server(object):
 
             torch.cuda.empty_cache()
 
-
     def test(self, test_on_training_data=False):
         if test_on_training_data:
-            metrics = {'loss': [], 'acc': []}
-            for client_idx in tqdm(range(self.total_num_client), desc='>> Local test for train', leave=True):
-                client = self.client_list[client_idx]
-                result = client.test(self.global_model, 'train')
+            self.test_on_training_data = True
+            self.test_on_data(self.total_num_client, phase='Train')
+
+        self.test_on_training_data = False
+        num_test_clients = len(self.test_clients)
+        self.test_on_data(num_test_clients, phase='Test')
+
+    def local_training(self, client_idx):
+        client = self.client_list[client_idx]
+        local_model, local_acc, local_loss = client.train(deepcopy(self.global_model), tracking=False)
+        torch.cuda.empty_cache()
+        return deepcopy(local_model.cpu()), local_loss / self.train_sizes[client_idx], local_acc
+
+    def local_testing(self, client_idx):
+        client = self.client_list[client_idx]
+        phase = 'train' if self.test_on_training_data else 'test'
+        result = client.test(self.global_model, phase)
+        torch.cuda.empty_cache()
+        return result
+
+    def test_on_data(self, num_clients_for_test, phase='Test'):
+        metrics = {'loss': [], 'acc': []}
+        if self.args.use_mp:
+            iter = 0
+            with mp.pool.ThreadPool(processes=self.nCPU) as pool:
+                iter += 1
+                result = pool.map(self.local_testing, [*range(num_clients_for_test)])
+                losses, accs = [x['loss'] for x in result], [x['acc'] for x in result]
+                metrics['loss'].extend(losses)
+                metrics['acc'].extend(accs)
+                sys.stdout.write(
+                    '\rClient {}/{} {}Loss {:.6f} {}Acc {:.4f}'.format(len(result) * iter, num_clients_for_test,
+                                                                       phase, sum(losses) / len(result),
+                                                                       phase, sum(accs) / len(result)))
+                print()
+        else:
+            for client_idx in tqdm(range(num_clients_for_test), desc=f'>> Local test on {phase} set', leave=True):
+                result = self.local_testing(client_idx)
                 metrics['loss'].append(result['loss'])
                 metrics['acc'].append(result['acc'])
                 sys.stdout.write(
-                    '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(client_idx, self.total_num_client,
-                                                                             result['loss'], result['acc']))
-
-            wandb.log({
-                'Train/Loss': sum(metrics['loss']) / self.total_num_client,
-                'Train/Acc': sum(metrics['acc']) / self.total_num_client
-            })
-            print('ALL Clients TrainLoss {:.6f} TrainAcc {:.4f}'.format(sum(metrics['loss']) / self.total_num_client,
-                                                                        sum(metrics['acc']) / self.total_num_client))
-
-
-        num_test_clients = len(self.test_clients)
-
-        metrics = {'loss': [], 'acc': [], 'auc': []}
-        for client_idx in tqdm(range(num_test_clients), desc='>> Local test', leave=True):
-            client = self.client_list[client_idx]
-            result = client.test(self.global_model, 'test')
-            metrics['loss'].append(result['loss'])
-            metrics['acc'].append(result['acc'])
-            metrics['auc'].append(result['auc'])
-            sys.stdout.write('\rClient {}/{} TestLoss {:.6f} TestAcc {:.4f} TestAUC {:.4f}'.format(client_idx, num_test_clients,
-                                                                                                   result['loss'], result['acc'], result['auc']))
+                    '\rClient {}/{} {}Loss {:.6f} {}Acc {:.4f}'.format(client_idx, num_clients_for_test,
+                                                                       phase, result['loss'], phase, result['acc']))
+                print()
 
         wandb.log({
-            'Test/Loss': sum(metrics['loss']) / num_test_clients,
-            'Test/Acc': sum(metrics['acc']) / num_test_clients,
-            'Test/AUC': sum(metrics['auc']) / num_test_clients
+            f'{phase}/Loss': sum(metrics['loss']) / num_clients_for_test,
+            f'{phase}/Acc': sum(metrics['acc']) / num_clients_for_test
         })
-
-        print('ALL Clients TestLoss {:.6f} TestAcc {:.4f}'.format(sum(metrics['loss']) / self.total_num_client,
-                                                                  sum(metrics['acc']) / self.total_num_client))
+        print('ALL Clients {}Loss {:.6f} {}Acc {:.4f}'.format(phase, sum(metrics['loss']) / num_clients_for_test,
+                                                              phase, sum(metrics['acc']) / num_clients_for_test))

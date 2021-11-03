@@ -56,6 +56,7 @@ def get_args():
 
     parser.add_argument('--fix_seed', action='store_true', default=False, help='fix random seed')
     parser.add_argument('--use_mp', action='store_true', default=False, help='use multiprocessing')
+    parser.add_argument('--nCPU', type=int, default=None, help='number of CPU cores for multiprocessing')
 
     args = parser.parse_args()
     return args
