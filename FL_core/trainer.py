@@ -29,7 +29,7 @@ class Trainer:
         model = model.to(self.device)
         model.train()
 
-        criterion = nn.CrossEntropyLoss().to(self.device)
+        criterion = nn.CrossEntropyLoss().to(self.device) #reduction='sum'
 
         if self.client_optimizer == 'sgd':
             optimizer = optim.SGD(model.parameters(), lr=self.lr, momentum=self.momentum, weight_decay=self.wdecay)

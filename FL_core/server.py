@@ -31,8 +31,12 @@ class Server(object):
         self.total_round = args.num_round
 
         self.trainer = Trainer(init_model, args)
+        self.test_on_training_data = False
 
         self._init_clients(init_model)
+
+        if self.args.method == 'Cluster1':
+            self.selection_method.setup(self.num_clients_per_round, self.train_sizes)
 
 
     def _init_clients(self, init_model):
@@ -49,8 +53,10 @@ class Server(object):
             self.global_model = self.trainer.get_model()
             # set clients
             client_indices = [*range(self.total_num_client)]
-            if self.selection_method is None:
-                client_indices = np.random.choice(client_indices, size=self.num_clients_per_round, replace=False)
+
+            # pre-client-selection
+            if self.args.method in ['Random', 'Cluster1']:
+                client_indices = self.selection_method.select(self.num_clients_per_round)
                 print(f'Selected clients: {sorted(client_indices)[:10]}')
 
             # local training
@@ -59,7 +65,8 @@ class Server(object):
                 iter = 0
                 with mp.pool.ThreadPool(processes=self.nCPU) as pool:
                     iter += 1
-                    result = pool.map(self.local_training, client_indices)
+                    result = list(tqdm(pool.imap(self.local_training, client_indices), desc='>> Local training'))
+                    #result = pool.map(self.local_training, client_indices)
                     result = np.array(result)
                     local_model, local_loss, local_acc = result[:,0], result[:,1], result[:,2]
                     local_models.extend(local_model.tolist())
@@ -78,9 +85,10 @@ class Server(object):
                     sys.stdout.write(
                         '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
                                                                                  local_loss, local_acc))
+            print()
 
             # client selection
-            if self.selection_method is not None:
+            if self.args.method == 'AFL':
                 selected_client_indices = self.selection_method.select(self.num_clients_per_round,
                                                                        local_losses, round_idx)
                 local_models = np.take(local_models, selected_client_indices).tolist()
@@ -88,8 +96,17 @@ class Server(object):
                 local_losses = np.take(local_losses, selected_client_indices)
                 accuracy = np.take(accuracy, selected_client_indices)
                 torch.cuda.empty_cache()
-
                 print(len(selected_client_indices), len(client_indices))
+
+            variance = 0
+            for k in local_models[0].state_dict().keys():
+                tmp = []
+                for local_model_param in local_models:
+                    tmp.extend(torch.flatten(local_model_param.cpu().state_dict()[k]).tolist())
+                variance += torch.var(torch.tensor(tmp), dim=0)
+            variance /= len(local_models)
+            print('variance of model weights {:.8f}'.format(variance))
+
             wandb.log({
                 'Train/Loss': sum(local_losses) / len(client_indices),
                 'Train/Acc': sum(accuracy) / len(client_indices)
@@ -104,24 +121,20 @@ class Server(object):
             self.trainer.set_model(self.global_model)
 
             # test
-            self.test()
+            if self.test_on_training_data:
+                self.test(self.total_num_client, phase='Train')
+
+            self.test_on_training_data = False
+            self.test(len(self.test_clients), phase='Test')
 
             torch.cuda.empty_cache()
 
-    def test(self, test_on_training_data=False):
-        if test_on_training_data:
-            self.test_on_training_data = True
-            self.test_on_data(self.total_num_client, phase='Train')
-
-        self.test_on_training_data = False
-        num_test_clients = len(self.test_clients)
-        self.test_on_data(num_test_clients, phase='Test')
 
     def local_training(self, client_idx):
         client = self.client_list[client_idx]
         local_model, local_acc, local_loss = client.train(deepcopy(self.global_model), tracking=False)
         torch.cuda.empty_cache()
-        return deepcopy(local_model.cpu()), local_loss / self.train_sizes[client_idx], local_acc
+        return deepcopy(local_model.cpu()), local_loss, local_acc # / self.train_sizes[client_idx]
 
     def local_testing(self, client_idx):
         client = self.client_list[client_idx]
@@ -130,7 +143,7 @@ class Server(object):
         torch.cuda.empty_cache()
         return result
 
-    def test_on_data(self, num_clients_for_test, phase='Test'):
+    def test(self, num_clients_for_test, phase='Test'):
         metrics = {'loss': [], 'acc': []}
         if self.args.use_mp:
             iter = 0
@@ -144,7 +157,7 @@ class Server(object):
                     '\rClient {}/{} {}Loss {:.6f} {}Acc {:.4f}'.format(len(result) * iter, num_clients_for_test,
                                                                        phase, sum(losses) / len(result),
                                                                        phase, sum(accs) / len(result)))
-                print()
+
         else:
             for client_idx in tqdm(range(num_clients_for_test), desc=f'>> Local test on {phase} set', leave=True):
                 result = self.local_testing(client_idx)
@@ -153,11 +166,9 @@ class Server(object):
                 sys.stdout.write(
                     '\rClient {}/{} {}Loss {:.6f} {}Acc {:.4f}'.format(client_idx, num_clients_for_test,
                                                                        phase, result['loss'], phase, result['acc']))
-                print()
-
         wandb.log({
             f'{phase}/Loss': sum(metrics['loss']) / num_clients_for_test,
             f'{phase}/Acc': sum(metrics['acc']) / num_clients_for_test
         })
-        print('ALL Clients {}Loss {:.6f} {}Acc {:.4f}'.format(phase, sum(metrics['loss']) / num_clients_for_test,
+        print('\nALL Clients {}Loss {:.6f} {}Acc {:.4f}'.format(phase, sum(metrics['loss']) / num_clients_for_test,
                                                               phase, sum(metrics['acc']) / num_clients_for_test))
