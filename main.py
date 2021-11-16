@@ -26,7 +26,8 @@ def get_args():
     parser.add_argument('--dataset', type=str, default='FederatedEMNIST', help='dataset', choices=['Reddit','FederatedEMNIST'])
     parser.add_argument('--data_dir', type=str, default='../dataset/FederatedEMNIST/', help='dataset directory')
     parser.add_argument('--model', type=str, default='CNN', help='model', choices=['BLSTM','CNN'])
-    parser.add_argument('--method', type=str, default='AFL', choices=['Random', 'AFL', 'Cluster1'], help='client selection')
+    parser.add_argument('--method', type=str, default='AFL', choices=['Random', 'AFL', 'Cluster1', 'Cluster2'],
+                        help='client selection')
     parser.add_argument('--fed_algo', type=str, default='FedAvg', choices=['FedAvg', 'FedAdam'],
                         help='Federated algorithm for aggregation')
 
@@ -52,6 +53,7 @@ def get_args():
     parser.add_argument('--total_num_clients', type=int, default=None, help='total number of clients')
 
     parser.add_argument('--maxlen', type=int, default=400, help='maxlen for NLP dataset')
+    parser.add_argument('--distance_type', type=str, default='L1', help='distance type for clustered sampling 2')
 
     parser.add_argument('--comment', type=str, default='', help='comment')
 
@@ -86,6 +88,8 @@ def client_selection_method(args, dataset):
         return ActiveFederatedLearning(args.total_num_client, args.device, args)
     elif args.method == 'Cluster1':
         return ClusteredSampling1(args.total_num_client, args.device)
+    elif args.method == 'Cluster2':
+        return ClusteredSampling2(args.total_num_client, args.device, args)
     else:
         return RandomSelection(args.total_num_client, args.device)
 
@@ -107,7 +111,8 @@ if __name__ == '__main__':
         project=f'AFL-{args.dataset}',
         name=f"{args.method}-{args.fed_algo}-{args.num_clients_per_round}{args.comment}",
         config=args,
-        dir='.'
+        dir='.',
+        save_code=True
     )
     args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(args.device)  # change allocation of current GPU
@@ -129,3 +134,11 @@ if __name__ == '__main__':
 
     # train
     ServerExecute.train()
+
+
+    # save code
+    from glob import glob
+    code = wandb.Artifact(f'AFL-{args.dataset}', type='code')
+    for path in glob('**/*.py', recursive=True):
+        code.add_file(path)
+    wandb.run.use_artifact(code)

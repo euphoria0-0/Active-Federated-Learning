@@ -37,6 +37,9 @@ class Server(object):
 
         if self.args.method == 'Cluster1':
             self.selection_method.setup(self.num_clients_per_round, self.train_sizes)
+        elif self.args.method == 'Cluster2':
+            self.selection_method.setup(self.train_sizes, self.global_model,
+                                        [c.trainer.get_model() for c in self.client_list])
 
 
     def _init_clients(self, init_model):
@@ -48,14 +51,14 @@ class Server(object):
 
     def train(self):
         for round_idx in range(self.total_round):
-            print(f'>> round {round_idx}')
+            print(f'\n>> round {round_idx}')
             # get global model
             self.global_model = self.trainer.get_model()
             # set clients
             client_indices = [*range(self.total_num_client)]
 
             # pre-client-selection
-            if self.args.method in ['Random', 'Cluster1']:
+            if self.args.method in ['Random', 'Cluster1', 'Cluster2']:
                 client_indices = self.selection_method.select(self.num_clients_per_round)
                 print(f'Selected clients: {sorted(client_indices)[:10]}')
 
@@ -76,6 +79,7 @@ class Server(object):
                         '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
                                                                                  local_loss.mean().item(),
                                                                                  local_acc.mean().item()))
+                print()
             else:
                 for client_idx in tqdm(client_indices, desc='>> Local training', leave=True):
                     local_model, local_loss, local_acc = self.local_training(client_idx)
@@ -85,7 +89,6 @@ class Server(object):
                     sys.stdout.write(
                         '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
                                                                                  local_loss, local_acc))
-            print()
 
             # client selection
             if self.args.method == 'AFL':
@@ -98,14 +101,7 @@ class Server(object):
                 torch.cuda.empty_cache()
                 print(len(selected_client_indices), len(client_indices))
 
-            variance = 0
-            for k in local_models[0].state_dict().keys():
-                tmp = []
-                for local_model_param in local_models:
-                    tmp.extend(torch.flatten(local_model_param.cpu().state_dict()[k]).tolist())
-                variance += torch.var(torch.tensor(tmp), dim=0)
-            variance /= len(local_models)
-            print('variance of model weights {:.8f}'.format(variance))
+            #self.weight_variance(local_models)
 
             wandb.log({
                 'Train/Loss': sum(local_losses) / len(client_indices),
@@ -119,6 +115,9 @@ class Server(object):
             global_model_params = self.federated_method.update(local_models, client_indices, self.global_model)
             self.global_model.load_state_dict(global_model_params)
             self.trainer.set_model(self.global_model)
+
+            if self.args.method == 'Cluster2':
+                self.selection_method.update(local_models, client_indices)
 
             # test
             if self.test_on_training_data:
@@ -157,7 +156,7 @@ class Server(object):
                     '\rClient {}/{} {}Loss {:.6f} {}Acc {:.4f}'.format(len(result) * iter, num_clients_for_test,
                                                                        phase, sum(losses) / len(result),
                                                                        phase, sum(accs) / len(result)))
-
+            print()
         else:
             for client_idx in tqdm(range(num_clients_for_test), desc=f'>> Local test on {phase} set', leave=True):
                 result = self.local_testing(client_idx)
@@ -170,5 +169,15 @@ class Server(object):
             f'{phase}/Loss': sum(metrics['loss']) / num_clients_for_test,
             f'{phase}/Acc': sum(metrics['acc']) / num_clients_for_test
         })
-        print('\nALL Clients {}Loss {:.6f} {}Acc {:.4f}'.format(phase, sum(metrics['loss']) / num_clients_for_test,
+        print('ALL Clients {}Loss {:.6f} {}Acc {:.4f}'.format(phase, sum(metrics['loss']) / num_clients_for_test,
                                                               phase, sum(metrics['acc']) / num_clients_for_test))
+
+    def weight_variance(self, local_models):
+        variance = 0
+        for k in tqdm(local_models[0].state_dict().keys(), desc='>> compute weight variance'):
+            tmp = []
+            for local_model_param in local_models:
+                tmp.extend(torch.flatten(local_model_param.cpu().state_dict()[k]).tolist())
+            variance += torch.var(torch.tensor(tmp), dim=0)
+        variance /= len(local_models)
+        print('variance of model weights {:.8f}'.format(variance))
