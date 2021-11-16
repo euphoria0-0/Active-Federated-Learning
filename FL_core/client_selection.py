@@ -65,7 +65,7 @@ class ActiveFederatedLearning(ClientSelection):
 
 
 
-'''Power of Choice'''
+'''Power-of-Choice'''
 class PowerOfChoice(ClientSelection):
     def __init__(self, total, device):
         super().__init__(total, device)
@@ -78,7 +78,6 @@ class PowerOfChoice(ClientSelection):
     def select_candidates(self, d):
         # 1) sample the candidate client set
         candidate_clients = np.random.choice(self.total, d, p=self.weights, replace=False)
-        self.candidate_clients_idxs = candidate_clients
         return candidate_clients
 
     def select(self, n, metric, r=None):
