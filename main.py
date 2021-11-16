@@ -14,9 +14,9 @@ import torch
 
 from data import reddit, federated_emnist
 from model import BLSTM, CNN
-from FL_core.server import Server
-from FL_core.client_selection import ActiveFederatedLearning
-from FL_core.federated_algorithm import FedAvg, FedAdam
+from FL_core.server import *
+from FL_core.client_selection import *
+from FL_core.federated_algorithm import *
 
 
 
@@ -26,7 +26,8 @@ def get_args():
     parser.add_argument('--dataset', type=str, default='FederatedEMNIST', help='dataset', choices=['Reddit','FederatedEMNIST'])
     parser.add_argument('--data_dir', type=str, default='../dataset/FederatedEMNIST/', help='dataset directory')
     parser.add_argument('--model', type=str, default='CNN', help='model', choices=['BLSTM','CNN'])
-    parser.add_argument('--method', type=str, default='AFL', choices=['Random', 'AFL'], help='client selection')
+    parser.add_argument('--method', type=str, default='AFL', choices=['Random', 'AFL'],
+                        help='client selection')
     parser.add_argument('--fed_algo', type=str, default='FedAvg', choices=['FedAvg', 'FedAdam'],
                         help='Federated algorithm for aggregation')
 
@@ -81,18 +82,19 @@ def create_model(args):
     return model
 
 
-def client_selection_method(args):
+def client_selection_method(args, dataset):
     if args.method == 'AFL':
         return ActiveFederatedLearning(args.total_num_client, args.device, args)
     else:
-        return None
+        return RandomSelection(args.total_num_client, args.device)
 
 
 def federated_algorithm(dataset, model, args):
     train_sizes = dataset['train']['data_sizes']
     if args.fed_algo == 'FedAdam':
         return FedAdam(train_sizes, model, args=args)
-    else:  # FedAvg
+    else:
+        # FedAvg
         return FedAvg(train_sizes, model)
 
 
@@ -104,7 +106,8 @@ if __name__ == '__main__':
         project=f'AFL-{args.dataset}',
         name=f"{args.method}-{args.fed_algo}-{args.num_clients_per_round}{args.comment}",
         config=args,
-        dir='.'
+        dir='.',
+        save_code=True
     )
     args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(args.device)  # change allocation of current GPU
@@ -118,7 +121,7 @@ if __name__ == '__main__':
 
     # set model
     model = create_model(args)
-    client_selection = client_selection_method(args)
+    client_selection = client_selection_method(args, dataset)
     fed_algo = federated_algorithm(dataset, model, args)
 
     # set federated optim algorithm
@@ -126,3 +129,11 @@ if __name__ == '__main__':
 
     # train
     ServerExecute.train()
+
+
+    # save code
+    from glob import glob
+    code = wandb.Artifact(f'AFL-{args.dataset}', type='code')
+    for path in glob('**/*.py', recursive=True):
+        code.add_file(path)
+    wandb.run.use_artifact(code)

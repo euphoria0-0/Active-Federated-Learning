@@ -10,7 +10,18 @@ class ClientSelection:
         pass
 
 
+'''Random Selection'''
+class RandomSelection(ClientSelection):
+    def __init__(self, total, device):
+        super().__init__(total, device)
 
+    def select(self, n, metric=None):
+        selected_client_idxs = np.random.choice(self.total, size=n, replace=False)
+        return selected_client_idxs
+
+
+
+'''Active Federated Learning'''
 class ActiveFederatedLearning(ClientSelection):
     def __init__(self, total, device, args):
         super().__init__(total, device)
