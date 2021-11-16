@@ -11,6 +11,7 @@ from itertools import product
 from scipy.cluster.hierarchy import fcluster, linkage
 from copy import deepcopy
 from tqdm import tqdm
+import torch
 
 
 class ClientSelection:
@@ -157,9 +158,9 @@ class ClusteredSampling2(ClientSelection):
         """
         local_model_params = []
         for model in local_models:
-            local_model_params += [[tens.detach().numpy() for tens in list(model.parameters())]]
+            local_model_params += [[tens.detach().to(self.device) for tens in list(model.parameters())]] #.numpy()
 
-        global_model_params = [tens.detach().numpy() for tens in list(global_m.parameters())]
+        global_model_params = [tens.detach().to(self.device) for tens in list(global_m.parameters())]
 
         local_model_grads = []
         for local_params in local_model_params:
@@ -176,7 +177,8 @@ class ClusteredSampling2(ClientSelection):
         """
         n_clients = len(local_model_grads)
 
-        metric_matrix = np.zeros((n_clients, n_clients))
+        #metric_matrix = np.zeros((n_clients, n_clients))
+        metric_matrix = torch.zeros((n_clients, n_clients))
         for i, j in tqdm(product(range(n_clients), range(n_clients)), desc='>> similarity', leave=True):
             metric_matrix[i, j] = self.get_similarity(
                 local_model_grads[i], local_model_grads[j], distance_type)
@@ -187,8 +189,9 @@ class ClusteredSampling2(ClientSelection):
         if distance_type == "L1":
             norm = 0
             for g_1, g_2 in zip(grad_1, grad_2):
-                norm += np.sum(np.abs(g_1 - g_2))
-            return norm
+                #norm += np.sum(np.abs(g_1 - g_2))
+                norm += torch.sum(torch.abs(g_1 - g_2))
+            return norm.cpu().data
 
         elif distance_type == "L2":
             norm = 0
