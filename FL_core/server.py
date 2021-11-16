@@ -35,7 +35,7 @@ class Server(object):
 
         self._init_clients(init_model)
 
-        if self.args.method == 'Cluster1':
+        if self.args.method in ['Cluster1', 'Pow-d']:
             self.selection_method.setup(self.num_clients_per_round, self.train_sizes)
         elif self.args.method == 'Cluster2':
             self.selection_method.setup(self.train_sizes, self.global_model,
@@ -61,6 +61,8 @@ class Server(object):
             if self.args.method in ['Random', 'Cluster1', 'Cluster2']:
                 client_indices = self.selection_method.select(self.num_clients_per_round)
                 print(f'Selected clients: {sorted(client_indices)[:10]}')
+            elif self.args.method == 'Pow-d':
+                client_indices = self.selection_method.select_candidates(self.args.d)
 
             # local training
             local_models, local_losses, accuracy = [], [], []
@@ -91,7 +93,7 @@ class Server(object):
                                                                                  local_loss, local_acc))
 
             # client selection
-            if self.args.method == 'AFL':
+            if self.args.method in ['AFL', 'Pow-d']:
                 selected_client_indices = self.selection_method.select(self.num_clients_per_round,
                                                                        local_losses, round_idx)
                 local_models = np.take(local_models, selected_client_indices).tolist()

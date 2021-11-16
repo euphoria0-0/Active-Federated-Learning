@@ -26,7 +26,7 @@ def get_args():
     parser.add_argument('--dataset', type=str, default='FederatedEMNIST', help='dataset', choices=['Reddit','FederatedEMNIST'])
     parser.add_argument('--data_dir', type=str, default='../dataset/FederatedEMNIST/', help='dataset directory')
     parser.add_argument('--model', type=str, default='CNN', help='model', choices=['BLSTM','CNN'])
-    parser.add_argument('--method', type=str, default='AFL', choices=['Random', 'AFL', 'Cluster1', 'Cluster2'],
+    parser.add_argument('--method', type=str, default='AFL', choices=['Random', 'AFL', 'Cluster1', 'Cluster2','Pow-d'],
                         help='client selection')
     parser.add_argument('--fed_algo', type=str, default='FedAvg', choices=['FedAvg', 'FedAdam'],
                         help='Federated algorithm for aggregation')
@@ -54,6 +54,7 @@ def get_args():
 
     parser.add_argument('--maxlen', type=int, default=400, help='maxlen for NLP dataset')
     parser.add_argument('--distance_type', type=str, default='L1', help='distance type for clustered sampling 2')
+    parser.add_argument('--d', type=int, default=None, help='d of power-of-choice')
 
     parser.add_argument('--comment', type=str, default='', help='comment')
 
@@ -90,6 +91,8 @@ def client_selection_method(args, dataset):
         return ClusteredSampling1(args.total_num_client, args.device)
     elif args.method == 'Cluster2':
         return ClusteredSampling2(args.total_num_client, args.device, args)
+    elif args.method == 'Pow-d':
+        return PowerOfChoice(args.total_num_client, args.device)
     else:
         return RandomSelection(args.total_num_client, args.device)
 

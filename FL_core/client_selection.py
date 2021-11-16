@@ -65,6 +65,30 @@ class ActiveFederatedLearning(ClientSelection):
 
 
 
+'''Power of Choice'''
+class PowerOfChoice(ClientSelection):
+    def __init__(self, total, device):
+        super().__init__(total, device)
+
+    def setup(self, n, n_samples):
+        client_ids = sorted(n_samples.keys())
+        n_samples = np.array([n_samples[i] for i in client_ids])
+        self.weights = n_samples / np.sum(n_samples)
+
+    def select_candidates(self, d):
+        # 1) sample the candidate client set
+        candidate_clients = np.random.choice(self.total, d, p=self.weights, replace=False)
+        self.candidate_clients_idxs = candidate_clients
+        return candidate_clients
+
+    def select(self, n, metric, r=None):
+        # 3) select highest loss clients
+        arg = np.argsort(metric)
+        selected_client_idxs = arg[-n:]
+        return selected_client_idxs
+
+
+
 '''Clustered Sampling Algorithm 1'''
 class ClusteredSampling1(ClientSelection):
     def __init__(self, total, device):
@@ -212,11 +236,6 @@ class ClusteredSampling2(ClientSelection):
                 norm /= np.sqrt(norm_1 * norm_2)
                 return np.arccos(norm)
 
-
-
-
-
-
     def get_clusters_with_alg2(self, linkage_matrix: np.array, n_sampled: int, weights: np.array):
         """Algorithm 2"""
         epsilon = int(10 ** 10)
@@ -279,6 +298,8 @@ class ClusteredSampling2(ClientSelection):
             distri_clusters[l] /= np.sum(distri_clusters[l])
 
         return distri_clusters
+
+
 
 
 '''def modified_exp(x, SAFETY=2.0):
