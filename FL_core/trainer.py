@@ -2,6 +2,7 @@ import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader
 import numpy as np
 from sklearn.metrics import roc_auc_score
 
@@ -25,6 +26,8 @@ class Trainer:
         self.model.load_state_dict(model.cpu().state_dict())
 
     def train(self, data, tracking=True):
+        dataloader = DataLoader(data, batch_size=self.batch_size, pin_memory=True)
+
         model = self.model
         model = model.to(self.device)
         model.train()
@@ -39,7 +42,7 @@ class Trainer:
         for epoch in range(self.num_epoch):
             train_loss, correct, total = 0., 0, 0
 
-            for input, labels in data:
+            for input, labels in dataloader:
                 input, labels = input.to(self.device), labels.to(self.device)
                 optimizer.zero_grad()
                 output = model(input)
@@ -67,6 +70,8 @@ class Trainer:
         return train_acc, train_loss
 
     def train_E0(self, data, tracking=True):
+        dataloader = DataLoader(data, batch_size=self.batch_size, pin_memory=True)
+
         model = self.model
         model = model.to(self.device)
         model.eval()
@@ -80,7 +85,7 @@ class Trainer:
 
         correct, total = 0, 0
         batch_loss = []
-        for input, labels in data:
+        for input, labels in dataloader:
             input, labels = input.to(self.device), labels.to(self.device)
             optimizer.zero_grad()
             output = model(input)
@@ -108,6 +113,8 @@ class Trainer:
         return train_acc, avg_loss.detach().cpu()
 
     def test(self, model, data):
+        dataloader = DataLoader(data, batch_size=self.batch_size, pin_memory=True)
+
         model = model.to(self.device)
         model.eval()
 
@@ -116,7 +123,7 @@ class Trainer:
         with torch.no_grad():
             test_loss, correct, total = 0., 0, 0
             y_true, y_score = np.empty((0)), np.empty((0))
-            for input, labels in data:
+            for input, labels in dataloader:
                 input, labels = input.to(self.device), labels.to(self.device)
                 output = model(input)
                 loss = criterion(output, labels.long())

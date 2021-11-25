@@ -45,11 +45,13 @@ class Server(object):
     def _init_clients(self, init_model):
         self.client_list = []
         for client_idx in range(self.total_num_client):
+            local_train_data = self.train_data[client_idx]
             local_test_data = np.array([]) if client_idx not in self.test_clients else self.test_data[client_idx]
-            c = Client(client_idx, self.train_data[client_idx], local_test_data, deepcopy(init_model), self.args)
+            c = Client(client_idx, self.train_sizes[client_idx], local_train_data, local_test_data,
+                       deepcopy(init_model), self.args)
             self.client_list.append(c)
 
-    def train(self):
+    def train(self, results=None):
         for round_idx in range(self.total_round):
             print(f'\n>> round {round_idx}')
             # get global model
@@ -92,10 +94,14 @@ class Server(object):
                         '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
                                                                                  local_loss, local_acc))
 
+            if results is not None and round_idx % 10 == 0:
+                np.array(local_losses).tofile(results, sep=',')
+                results.write("\n")
+
             # client selection
             if self.args.method in ['AFL', 'Pow-d']:
                 selected_client_indices = self.selection_method.select(self.num_clients_per_round,
-                                                                       local_losses, round_idx)
+                                                                       local_losses, round_idx, results)
                 local_models = np.take(local_models, selected_client_indices).tolist()
                 client_indices = np.take(client_indices, selected_client_indices).tolist()
                 local_losses = np.take(local_losses, selected_client_indices)
@@ -129,6 +135,9 @@ class Server(object):
             self.test(len(self.test_clients), phase='Test')
 
             torch.cuda.empty_cache()
+
+        if results is not None:
+            results.close()
 
 
     def local_training(self, client_idx):
