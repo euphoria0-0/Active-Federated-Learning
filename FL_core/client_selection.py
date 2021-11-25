@@ -327,10 +327,17 @@ class MaxEntropySampling(ClientSelection):
         super().__init__(total, device)
         self.alpha2 = args.alpha2
 
-    def select(self, n, metric, seed=0):
+    def select(self, n, metric, seed=0, results=None):
         probs = np.exp(np.array(metric) * self.alpha2)
         probs /= sum(probs)
         selected_client_idxs = np.random.choice(self.total, n, p=probs, replace=False)
+        if results is not None and seed % 10 == 0:
+            probs.tofile(results, sep=',')
+            results.write("\n")
+            tmp = np.zeros(len(probs))
+            tmp[selected_client_idxs] = 1
+            tmp.tofile(results, sep=',')
+            results.write("\n")
         return selected_client_idxs.astype(int)
 
 
