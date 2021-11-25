@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 '''
 Client Selection
 
@@ -12,6 +13,9 @@ from scipy.cluster.hierarchy import fcluster, linkage
 from copy import deepcopy
 from tqdm import tqdm
 import torch
+=======
+import numpy as np
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
 
 
 class ClientSelection:
@@ -42,6 +46,7 @@ class ActiveFederatedLearning(ClientSelection):
         self.alpha2 = args.alpha2 #0.01
         self.alpha3 = args.alpha3 #0.1
 
+<<<<<<< HEAD
     def select(self, n, metric, seed=0, results=None):
         # set sampling distribution
         values = np.exp(np.array(metric) * self.alpha2)
@@ -353,13 +358,22 @@ class ActiveFederatedLearning_1_p(ClientSelection):
     def select(self, n, metric, seed=0, results=None):
         # set sampling distribution
         values = np.exp(np.array(metric) * self.alpha2)
+=======
+    def select(self, n, metric, seed=0):
+        # set sampling distribution
+        probs = np.exp(np.array(metric) * self.alpha2)
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
         # 1) select 75% of K(total) users
         num_select = int(self.alpha1 * self.total)
         argsorted_value_list = np.argsort(metric)
         drop_client_idxs = argsorted_value_list[:self.total - num_select]
+<<<<<<< HEAD
         probs = deepcopy(values)
         probs[drop_client_idxs] = 0
         probs = sum(probs) - probs
+=======
+        probs[drop_client_idxs] = 0
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
         probs /= sum(probs)
         #probs = np.nan_to_num(probs, nan=max(probs))
         # 2) select 99% of m users using prob.
@@ -371,6 +385,7 @@ class ActiveFederatedLearning_1_p(ClientSelection):
         selected2 = np.random.choice(not_selected, n - num_select, replace=False)
         selected_client_idxs = np.append(selected, selected2, axis=0)
         print(f'{len(selected_client_idxs)} selected users: {selected_client_idxs}')
+<<<<<<< HEAD
 
         if results is not None and seed % 10 == 0:
             values.tofile(results, sep=',')
@@ -385,10 +400,20 @@ class ActiveFederatedLearning_1_p(ClientSelection):
 
 
 '''def modified_exp(x, SAFETY=2.0):
+=======
+        return selected_client_idxs.astype(int)
+
+
+def modified_exp(x, SAFETY=2.0):
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
     mrn = np.finfo(x.dtype).max
     threshold = np.log(mrn / x.size) - SAFETY
     xmax = x.max()
     if xmax > threshold:
         return np.exp(x - (xmax - threshold))
     else:
+<<<<<<< HEAD
         return np.exp(x)'''
+=======
+        return np.exp(x)
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0

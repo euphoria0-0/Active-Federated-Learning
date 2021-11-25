@@ -10,8 +10,13 @@ from torch.utils.data import TensorDataset
 class FederatedEMNISTDataset:
     def __init__(self, data_dir, args):
         self.num_classes = 62
+<<<<<<< HEAD
         self.train_num_clients = 3400 if args.total_num_clients is None else args.total_num_clients
         self.test_num_clients = 3400 if args.total_num_clients is None else args.total_num_clients
+=======
+        self.train_num_clients = 3400
+        self.test_num_clients = 3400
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
         self.batch_size = args.batch_size # local batch size for local training
 
         self._init_data(data_dir)
@@ -23,21 +28,34 @@ class FederatedEMNISTDataset:
             with open(file_name, 'rb') as f:
                 dataset = pickle.load(f)
         else:
+<<<<<<< HEAD
             dataset = preprocess(data_dir, self.train_num_clients)
             #dataset = batch_preprocess(data_dir, self.batch_size, self.train_num_clients)
+=======
+            dataset = preprocess(data_dir, self.batch_size)
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
         self.dataset = dataset
 
 
 
 
+<<<<<<< HEAD
 def preprocess(data_dir, num_clients=None):
+=======
+def preprocess(data_dir, batch_size=128):
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
     train_data = h5py.File(os.path.join(data_dir, 'fed_emnist_train.h5'), 'r')
     test_data = h5py.File(os.path.join(data_dir, 'fed_emnist_test.h5'), 'r')
 
     train_ids = list(train_data['examples'].keys())
     test_ids = list(test_data['examples'].keys())
+<<<<<<< HEAD
     num_clients_train = len(train_ids) if num_clients is None else num_clients
     num_clients_test = len(test_ids) if num_clients is None else num_clients
+=======
+    num_clients_train = len(train_ids)
+    num_clients_test = len(test_ids)
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
     print(f'num_clients_train {num_clients_train} num_clients_test {num_clients_test}')
 
     # local dataset
@@ -47,6 +65,7 @@ def preprocess(data_dir, num_clients=None):
     for client_idx in range(num_clients_train):
         client_id = train_ids[client_idx]
 
+<<<<<<< HEAD
         # train
         train_x = np.expand_dims(train_data['examples'][client_id]['pixels'][()], axis=1)
         train_y = train_data['examples'][client_id]['label'][()]
@@ -101,6 +120,8 @@ def batch_preprocess(data_dir, batch_size=128, num_clients=None):
         client_id = train_ids[client_idx]
 
         # train
+=======
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
         train_x = train_data['examples'][client_id]['pixels'][()]
         train_y = train_data['examples'][client_id]['label'][()]
 
@@ -108,7 +129,10 @@ def batch_preprocess(data_dir, batch_size=128, num_clients=None):
         train_data_local_dict[client_idx] = local_data
         train_data_local_num_dict[client_idx] = len(train_x)
 
+<<<<<<< HEAD
         # test
+=======
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
         test_x = test_data['examples'][client_id]['pixels'][()]
         test_y = test_data['examples'][client_id]['label'][()]
         local_data = _batch_data({'pixels': test_x, 'label': test_y}, batch_size=batch_size)

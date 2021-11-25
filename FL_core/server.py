@@ -35,16 +35,20 @@ class Server(object):
 
         self._init_clients(init_model)
 
+<<<<<<< HEAD
         if self.args.method in ['Cluster1', 'Pow-d']:
             self.selection_method.setup(self.num_clients_per_round, self.train_sizes)
         elif self.args.method == 'Cluster2':
             self.selection_method.setup(self.train_sizes, self.global_model,
                                         [c.trainer.get_model() for c in self.client_list])
 
+=======
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
 
     def _init_clients(self, init_model):
         self.client_list = []
         for client_idx in range(self.total_num_client):
+<<<<<<< HEAD
             local_train_data = self.train_data[client_idx]
             local_test_data = np.array([]) if client_idx not in self.test_clients else self.test_data[client_idx]
             c = Client(client_idx, self.train_sizes[client_idx], local_train_data, local_test_data,
@@ -52,6 +56,13 @@ class Server(object):
             self.client_list.append(c)
 
     def train(self, results=None):
+=======
+            local_test_data = np.array([]) if client_idx not in self.test_clients else self.test_data[client_idx]
+            c = Client(client_idx, self.train_data[client_idx], local_test_data, deepcopy(init_model), self.args)
+            self.client_list.append(c)
+
+    def train(self):
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
         for round_idx in range(self.total_round):
             print(f'\n>> round {round_idx}')
             # get global model
@@ -60,11 +71,17 @@ class Server(object):
             client_indices = [*range(self.total_num_client)]
 
             # pre-client-selection
+<<<<<<< HEAD
             if self.args.method in ['Random', 'Cluster1', 'Cluster2']:
                 client_indices = self.selection_method.select(self.num_clients_per_round)
                 print(f'Selected clients: {sorted(client_indices)[:10]}')
             elif self.args.method == 'Pow-d':
                 client_indices = self.selection_method.select_candidates(self.args.d)
+=======
+            if self.args.method == 'Random':
+                client_indices = self.selection_method.select(self.num_clients_per_round)
+                print(f'Selected clients: {sorted(client_indices)[:10]}')
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
 
             # local training
             local_models, local_losses, accuracy = [], [], []
@@ -73,7 +90,10 @@ class Server(object):
                 with mp.pool.ThreadPool(processes=self.nCPU) as pool:
                     iter += 1
                     result = list(tqdm(pool.imap(self.local_training, client_indices), desc='>> Local training'))
+<<<<<<< HEAD
                     #result = pool.map(self.local_training, client_indices)
+=======
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
                     result = np.array(result)
                     local_model, local_loss, local_acc = result[:,0], result[:,1], result[:,2]
                     local_models.extend(local_model.tolist())
@@ -94,6 +114,7 @@ class Server(object):
                         '\rClient {}/{} TrainLoss {:.6f} TrainAcc {:.4f}'.format(len(local_losses), len(client_indices),
                                                                                  local_loss, local_acc))
 
+<<<<<<< HEAD
             if results is not None and round_idx % 10 == 0:
                 np.array(local_losses).tofile(results, sep=',')
                 results.write("\n")
@@ -102,6 +123,12 @@ class Server(object):
             if self.args.method in ['AFL', 'Pow-d']:
                 selected_client_indices = self.selection_method.select(self.num_clients_per_round,
                                                                        local_losses, round_idx, results)
+=======
+            # client selection
+            if self.args.method == 'AFL':
+                selected_client_indices = self.selection_method.select(self.num_clients_per_round,
+                                                                       local_losses, round_idx)
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
                 local_models = np.take(local_models, selected_client_indices).tolist()
                 client_indices = np.take(client_indices, selected_client_indices).tolist()
                 local_losses = np.take(local_losses, selected_client_indices)
@@ -124,9 +151,12 @@ class Server(object):
             self.global_model.load_state_dict(global_model_params)
             self.trainer.set_model(self.global_model)
 
+<<<<<<< HEAD
             if self.args.method == 'Cluster2':
                 self.selection_method.update(local_models, client_indices)
 
+=======
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
             # test
             if self.test_on_training_data:
                 self.test(self.total_num_client, phase='Train')
@@ -136,9 +166,12 @@ class Server(object):
 
             torch.cuda.empty_cache()
 
+<<<<<<< HEAD
         if results is not None:
             results.close()
 
+=======
+>>>>>>> beeafa95854742b23768dd6e6bc67a60d6998df0
 
     def local_training(self, client_idx):
         client = self.client_list[client_idx]
