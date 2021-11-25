@@ -42,13 +42,14 @@ class ActiveFederatedLearning(ClientSelection):
         self.alpha2 = args.alpha2 #0.01
         self.alpha3 = args.alpha3 #0.1
 
-    def select(self, n, metric, seed=0):
+    def select(self, n, metric, seed=0, results=None):
         # set sampling distribution
-        probs = np.exp(np.array(metric) * self.alpha2)
+        values = np.exp(np.array(metric) * self.alpha2)
         # 1) select 75% of K(total) users
         num_select = int(self.alpha1 * self.total)
         argsorted_value_list = np.argsort(metric)
         drop_client_idxs = argsorted_value_list[:self.total - num_select]
+        probs = deepcopy(values)
         probs[drop_client_idxs] = 0
         probs /= sum(probs)
         #probs = np.nan_to_num(probs, nan=max(probs))
@@ -61,6 +62,16 @@ class ActiveFederatedLearning(ClientSelection):
         selected2 = np.random.choice(not_selected, n - num_select, replace=False)
         selected_client_idxs = np.append(selected, selected2, axis=0)
         print(f'{len(selected_client_idxs)} selected users: {selected_client_idxs}')
+
+        if results is not None and seed % 10 == 0:
+            values.astype(np.float32).tofile(results, sep=',')
+            results.write("\n")
+            probs.astype(np.float32).tofile(results, sep=',')
+            results.write("\n")
+            tmp = np.zeros(len(probs), dtype=int)
+            tmp[selected_client_idxs] = 1
+            tmp.tofile(results, sep=',')
+            results.write("\n")
         return selected_client_idxs.astype(int)
 
 
@@ -299,6 +310,71 @@ class ClusteredSampling2(ClientSelection):
         return distri_clusters
 
 
+'''Max Entropy'''
+class MaxEntropy(ClientSelection):
+    def __init__(self, total, device):
+        super().__init__(total, device)
+
+    def select(self, n, metric, seed=0):
+        selected_client_idxs = np.argsort(metric)[-n:]
+        return selected_client_idxs.astype(int)
+
+
+
+'''Max Entropy with sampling'''
+class MaxEntropySampling(ClientSelection):
+    def __init__(self, total, device, args):
+        super().__init__(total, device)
+        self.alpha2 = args.alpha2
+
+    def select(self, n, metric, seed=0):
+        probs = np.exp(np.array(metric) * self.alpha2)
+        probs /= sum(probs)
+        selected_client_idxs = np.random.choice(self.total, n, p=probs, replace=False)
+        return selected_client_idxs.astype(int)
+
+
+
+'''Active Federated Learning (1-p)'''
+class ActiveFederatedLearning_1_p(ClientSelection):
+    def __init__(self, total, device, args):
+        super().__init__(total, device)
+        self.alpha1 = args.alpha1 #0.75
+        self.alpha2 = args.alpha2 #0.01
+        self.alpha3 = args.alpha3 #0.1
+
+    def select(self, n, metric, seed=0, results=None):
+        # set sampling distribution
+        values = np.exp(np.array(metric) * self.alpha2)
+        # 1) select 75% of K(total) users
+        num_select = int(self.alpha1 * self.total)
+        argsorted_value_list = np.argsort(metric)
+        drop_client_idxs = argsorted_value_list[:self.total - num_select]
+        probs = deepcopy(values)
+        probs[drop_client_idxs] = 0
+        probs = sum(probs) - probs
+        probs /= sum(probs)
+        #probs = np.nan_to_num(probs, nan=max(probs))
+        # 2) select 99% of m users using prob.
+        num_select = int((1 - self.alpha3) * n)
+        np.random.seed(seed)
+        selected = np.random.choice(self.total, num_select, p=probs, replace=False)
+        # 3) select 1% of m users randomly
+        not_selected = np.array(list(set(np.arange(self.total)) - set(selected)))
+        selected2 = np.random.choice(not_selected, n - num_select, replace=False)
+        selected_client_idxs = np.append(selected, selected2, axis=0)
+        print(f'{len(selected_client_idxs)} selected users: {selected_client_idxs}')
+
+        if results is not None and seed % 10 == 0:
+            values.tofile(results, sep=',')
+            results.write("\n")
+            probs.tofile(results, sep=',')
+            results.write("\n")
+            tmp = np.zeros(len(probs))
+            tmp[selected_client_idxs] = 1
+            tmp.tofile(results, sep=',')
+            results.write("\n")
+        return selected_client_idxs.astype(int)
 
 
 '''def modified_exp(x, SAFETY=2.0):
